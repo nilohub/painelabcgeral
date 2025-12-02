@@ -1,13 +1,166 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState, useEffect } from "react";
+import { Layout } from "@/components/Layout";
+import { DashboardFilters } from "@/components/DashboardFilters";
+import { StatsCards } from "@/components/StatsCards";
+import { SalesCharts } from "@/components/SalesCharts";
+import { TopProductsTable } from "@/components/TopProductsTable";
+import { supabase } from "@/integrations/supabase/client";
+import { Loader2, FileWarning } from "lucide-react";
+
+export interface SalesData {
+  id: string;
+  year: number;
+  month: number;
+  store: string;
+  subgroup: string;
+  product_code: string;
+  product_description: string;
+  quantity: number;
+  sales_value: number;
+  profit: number;
+  quantity_percentage: number;
+  sales_percentage: number;
+  profit_percentage: number;
+}
+
+export interface Filters {
+  year: string;
+  month: string;
+  store: string;
+  subgroup: string;
+}
 
 const Index = () => {
+  const [data, setData] = useState<SalesData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState<Filters>({
+    year: "all",
+    month: "all",
+    store: "all",
+    subgroup: "all",
+  });
+  const [availableFilters, setAvailableFilters] = useState({
+    years: [] as string[],
+    months: [] as string[],
+    stores: [] as string[],
+    subgroups: [] as string[],
+  });
+
+  useEffect(() => {
+    fetchData();
+    fetchFilterOptions();
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [filters]);
+
+  const fetchFilterOptions = async () => {
+    const { data: salesData } = await supabase
+      .from("sales_data")
+      .select("year, month, store, subgroup");
+
+    if (salesData) {
+      const years = [...new Set(salesData.map((d) => d.year.toString()))].sort();
+      const months = [...new Set(salesData.map((d) => d.month.toString()))].sort((a, b) => Number(a) - Number(b));
+      const stores = [...new Set(salesData.map((d) => d.store))].sort();
+      const subgroups = [...new Set(salesData.map((d) => d.subgroup))].sort();
+
+      setAvailableFilters({ years, months, stores, subgroups });
+    }
+  };
+
+  const fetchData = async () => {
+    setLoading(true);
+    let query = supabase.from("sales_data").select("*");
+
+    if (filters.year !== "all") {
+      query = query.eq("year", parseInt(filters.year));
+    }
+    if (filters.month !== "all") {
+      query = query.eq("month", parseInt(filters.month));
+    }
+    if (filters.store !== "all") {
+      query = query.eq("store", filters.store);
+    }
+    if (filters.subgroup !== "all") {
+      query = query.eq("subgroup", filters.subgroup);
+    }
+
+    const { data: salesData, error } = await query;
+
+    if (error) {
+      console.error("Error fetching data:", error);
+    } else {
+      setData(salesData || []);
+    }
+    setLoading(false);
+  };
+
+  const handleFilterChange = (key: keyof Filters, value: string) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex h-[60vh] items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <p className="text-muted-foreground">Carregando dados...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (data.length === 0) {
+    return (
+      <Layout>
+        <div className="flex h-[60vh] items-center justify-center">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted">
+              <FileWarning className="h-10 w-10 text-muted-foreground" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-foreground">Nenhum dado encontrado</h2>
+              <p className="mt-1 text-muted-foreground">
+                Faça upload de arquivos Excel para começar a análise
+              </p>
+            </div>
+            <a
+              href="/upload"
+              className="mt-4 inline-flex items-center gap-2 rounded-lg gradient-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-glow transition-transform hover:scale-105"
+            >
+              Fazer Upload
+            </a>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+    <Layout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Dashboard de Vendas</h1>
+          <p className="text-muted-foreground">Análise completa dos dados de vendas por período</p>
+        </div>
+
+        <DashboardFilters
+          filters={filters}
+          availableFilters={availableFilters}
+          onFilterChange={handleFilterChange}
+        />
+
+        <StatsCards data={data} />
+
+        <SalesCharts data={data} />
+
+        <TopProductsTable data={data} />
       </div>
-    </div>
+    </Layout>
   );
 };
 
