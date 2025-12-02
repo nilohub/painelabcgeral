@@ -7,7 +7,6 @@ import { TopProductsTable } from "@/components/TopProductsTable";
 import { ProductSearch } from "@/components/ProductSearch";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, FileWarning } from "lucide-react";
-
 export interface SalesData {
   id: string;
   year: number;
@@ -23,14 +22,12 @@ export interface SalesData {
   sales_percentage: number;
   profit_percentage: number;
 }
-
 export interface Filters {
   year: string;
   month: string;
   store: string;
   subgroup: string;
 }
-
 const Index = () => {
   const [data, setData] = useState<SalesData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,54 +35,47 @@ const Index = () => {
     year: "all",
     month: "all",
     store: "all",
-    subgroup: "all",
+    subgroup: "all"
   });
   const [searchTerm, setSearchTerm] = useState("");
-
   const filteredData = useMemo(() => {
     if (!searchTerm.trim()) return data;
     const term = searchTerm.toLowerCase();
-    return data.filter(
-      (item) =>
-        item.product_code.toLowerCase().includes(term) ||
-        item.product_description.toLowerCase().includes(term)
-    );
+    return data.filter(item => item.product_code.toLowerCase().includes(term) || item.product_description.toLowerCase().includes(term));
   }, [data, searchTerm]);
   const [availableFilters, setAvailableFilters] = useState({
     years: [] as string[],
     months: [] as string[],
     stores: [] as string[],
-    subgroups: [] as string[],
+    subgroups: [] as string[]
   });
-
   useEffect(() => {
     fetchData();
     fetchFilterOptions();
   }, []);
-
   useEffect(() => {
     fetchData();
   }, [filters]);
-
   const fetchFilterOptions = async () => {
-    const { data: salesData } = await supabase
-      .from("sales_data")
-      .select("year, month, store, subgroup");
-
+    const {
+      data: salesData
+    } = await supabase.from("sales_data").select("year, month, store, subgroup");
     if (salesData) {
-      const years = [...new Set(salesData.map((d) => d.year.toString()))].sort();
-      const months = [...new Set(salesData.map((d) => d.month.toString()))].sort((a, b) => Number(a) - Number(b));
-      const stores = [...new Set(salesData.map((d) => d.store))].sort();
-      const subgroups = [...new Set(salesData.map((d) => d.subgroup))].sort();
-
-      setAvailableFilters({ years, months, stores, subgroups });
+      const years = [...new Set(salesData.map(d => d.year.toString()))].sort();
+      const months = [...new Set(salesData.map(d => d.month.toString()))].sort((a, b) => Number(a) - Number(b));
+      const stores = [...new Set(salesData.map(d => d.store))].sort();
+      const subgroups = [...new Set(salesData.map(d => d.subgroup))].sort();
+      setAvailableFilters({
+        years,
+        months,
+        stores,
+        subgroups
+      });
     }
   };
-
   const fetchData = async () => {
     setLoading(true);
     let query = supabase.from("sales_data").select("*");
-
     if (filters.year !== "all") {
       query = query.eq("year", parseInt(filters.year));
     }
@@ -98,9 +88,10 @@ const Index = () => {
     if (filters.subgroup !== "all") {
       query = query.eq("subgroup", filters.subgroup);
     }
-
-    const { data: salesData, error } = await query;
-
+    const {
+      data: salesData,
+      error
+    } = await query;
     if (error) {
       console.error("Error fetching data:", error);
     } else {
@@ -108,27 +99,24 @@ const Index = () => {
     }
     setLoading(false);
   };
-
   const handleFilterChange = (key: keyof Filters, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
+    setFilters(prev => ({
+      ...prev,
+      [key]: value
+    }));
   };
-
   if (loading) {
-    return (
-      <Layout>
+    return <Layout>
         <div className="flex h-[60vh] items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
             <p className="text-muted-foreground">Carregando dados...</p>
           </div>
         </div>
-      </Layout>
-    );
+      </Layout>;
   }
-
   if (data.length === 0) {
-    return (
-      <Layout>
+    return <Layout>
         <div className="flex h-[60vh] items-center justify-center">
           <div className="flex flex-col items-center gap-4 text-center">
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted">
@@ -140,40 +128,28 @@ const Index = () => {
                 Faça upload de arquivos Excel para começar a análise
               </p>
             </div>
-            <a
-              href="/upload"
-              className="mt-4 inline-flex items-center gap-2 rounded-lg gradient-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-glow transition-transform hover:scale-105"
-            >
+            <a href="/upload" className="mt-4 inline-flex items-center gap-2 rounded-lg gradient-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-glow transition-transform hover:scale-105">
               Fazer Upload
             </a>
           </div>
         </div>
-      </Layout>
-    );
+      </Layout>;
   }
-
-  return (
-    <Layout>
+  return <Layout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Dashboard de Vendas</h1>
+          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
           <p className="text-muted-foreground">Análise completa dos dados de vendas por período</p>
         </div>
 
         <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
-          <DashboardFilters
-            filters={filters}
-            availableFilters={availableFilters}
-            onFilterChange={handleFilterChange}
-          />
+          <DashboardFilters filters={filters} availableFilters={availableFilters} onFilterChange={handleFilterChange} />
           <ProductSearch value={searchTerm} onChange={setSearchTerm} />
         </div>
 
-        {searchTerm && (
-          <p className="text-sm text-muted-foreground">
+        {searchTerm && <p className="text-sm text-muted-foreground">
             Mostrando {filteredData.length} resultado(s) para "{searchTerm}"
-          </p>
-        )}
+          </p>}
 
         <StatsCards data={filteredData} />
 
@@ -181,8 +157,6 @@ const Index = () => {
 
         <TopProductsTable data={filteredData} />
       </div>
-    </Layout>
-  );
+    </Layout>;
 };
-
 export default Index;
