@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Layout } from "@/components/Layout";
 import { DashboardFilters } from "@/components/DashboardFilters";
 import { StatsCards } from "@/components/StatsCards";
 import { SalesCharts } from "@/components/SalesCharts";
 import { TopProductsTable } from "@/components/TopProductsTable";
+import { ProductSearch } from "@/components/ProductSearch";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, FileWarning } from "lucide-react";
 
@@ -39,6 +40,17 @@ const Index = () => {
     store: "all",
     subgroup: "all",
   });
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredData = useMemo(() => {
+    if (!searchTerm.trim()) return data;
+    const term = searchTerm.toLowerCase();
+    return data.filter(
+      (item) =>
+        item.product_code.toLowerCase().includes(term) ||
+        item.product_description.toLowerCase().includes(term)
+    );
+  }, [data, searchTerm]);
   const [availableFilters, setAvailableFilters] = useState({
     years: [] as string[],
     months: [] as string[],
@@ -148,17 +160,26 @@ const Index = () => {
           <p className="text-muted-foreground">Análise completa dos dados de vendas por período</p>
         </div>
 
-        <DashboardFilters
-          filters={filters}
-          availableFilters={availableFilters}
-          onFilterChange={handleFilterChange}
-        />
+        <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
+          <DashboardFilters
+            filters={filters}
+            availableFilters={availableFilters}
+            onFilterChange={handleFilterChange}
+          />
+          <ProductSearch value={searchTerm} onChange={setSearchTerm} />
+        </div>
 
-        <StatsCards data={data} />
+        {searchTerm && (
+          <p className="text-sm text-muted-foreground">
+            Mostrando {filteredData.length} resultado(s) para "{searchTerm}"
+          </p>
+        )}
 
-        <SalesCharts data={data} />
+        <StatsCards data={filteredData} />
 
-        <TopProductsTable data={data} />
+        <SalesCharts data={filteredData} />
+
+        <TopProductsTable data={filteredData} />
       </div>
     </Layout>
   );
