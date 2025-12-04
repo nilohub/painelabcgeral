@@ -1,18 +1,30 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Legend, AreaChart, Area } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area } from "recharts";
 import type { SalesData } from "@/pages/Index";
+
 interface SalesChartsProps {
   data: SalesData[];
 }
+
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+// Using CSS variables for consistent theming
 const COLORS = {
-  sales: "hsl(200, 90%, 50%)",
-  profit: "hsl(165, 70%, 45%)",
-  quantity: "hsl(280, 60%, 55%)",
-  accent: "hsl(35, 95%, 55%)"
+  sales: "hsl(var(--chart-sales))",
+  profit: "hsl(var(--chart-profit))",
+  quantity: "hsl(var(--chart-quantity))",
+  accent: "hsl(var(--chart-accent))"
 };
-const PIE_COLORS = ["hsl(200, 90%, 50%)", "hsl(165, 70%, 45%)", "hsl(280, 60%, 55%)", "hsl(35, 95%, 55%)", "hsl(340, 70%, 50%)", "hsl(45, 90%, 50%)"];
+
+const PIE_COLORS = [
+  "hsl(var(--chart-sales))",
+  "hsl(var(--chart-profit))",
+  "hsl(var(--chart-quantity))",
+  "hsl(var(--chart-accent))",
+  "hsl(var(--destructive))",
+  "hsl(var(--primary))"
+];
 export function SalesCharts({
   data
 }: SalesChartsProps) {
