@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Upload, History, User } from "lucide-react";
+import { Upload, History, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 interface LayoutProps {
   children: React.ReactNode;
@@ -26,11 +26,11 @@ export function Layout({
         <div className="container flex h-16 items-center justify-between">
           <Link to="/" className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl gradient-primary shadow-glow">
-              <User className="h-5 w-5 text-primary-foreground" />
+              <BarChart3 className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-foreground">​Análise de curva ABC </h1>
-              <p className="text-xs text-muted-foreground">Painel de dados </p>
+              <h1 className="text-lg font-bold text-foreground">Análise de Curva ABC</h1>
+              <p className="text-xs text-muted-foreground">Painel de Dados</p>
             </div>
           </Link>
 
