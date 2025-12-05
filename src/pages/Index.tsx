@@ -43,6 +43,12 @@ const Index = () => {
     const term = searchTerm.toLowerCase();
     return data.filter(item => item.product_code.toLowerCase().includes(term) || item.product_description.toLowerCase().includes(term));
   }, [data, searchTerm]);
+
+  const matchedProductName = useMemo(() => {
+    if (!searchTerm.trim() || filteredData.length === 0) return undefined;
+    const firstMatch = filteredData[0];
+    return `${firstMatch.product_code} - ${firstMatch.product_description}`;
+  }, [filteredData, searchTerm]);
   const [availableFilters, setAvailableFilters] = useState({
     years: [] as string[],
     months: [] as string[],
@@ -158,14 +164,15 @@ const Index = () => {
           <p className="text-muted-foreground">Análise completa dos dados de vendas por período</p>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
+        <div className="flex flex-col md:flex-row gap-4 md:items-start md:justify-between">
           <DashboardFilters filters={filters} availableFilters={availableFilters} onFilterChange={handleFilterChange} />
-          <ProductSearch value={searchTerm} onChange={setSearchTerm} />
+          <ProductSearch 
+            value={searchTerm} 
+            onChange={setSearchTerm} 
+            resultCount={searchTerm ? filteredData.length : undefined}
+            matchedProduct={matchedProductName}
+          />
         </div>
-
-        {searchTerm && <p className="text-sm text-muted-foreground">
-            Mostrando {filteredData.length} resultado(s) para "{searchTerm}"
-          </p>}
 
         <StatsCards data={filteredData} />
 
