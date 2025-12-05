@@ -76,6 +76,36 @@ const Upload = () => {
     setPendingFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Função para parsear números com vírgula ou ponto como separador decimal
+  const parseNumber = (value: any): number => {
+    if (value === null || value === undefined || value === "") return 0;
+    if (typeof value === "number") return value;
+    
+    // Converte para string e trata separadores
+    const str = value.toString().trim();
+    
+    // Remove espaços e caracteres não numéricos exceto vírgula, ponto e sinal negativo
+    const cleaned = str.replace(/[^\d,.\-]/g, "");
+    
+    if (!cleaned) return 0;
+    
+    // Se tem vírgula como último separador, assume formato brasileiro (1.234,56)
+    const lastComma = cleaned.lastIndexOf(",");
+    const lastDot = cleaned.lastIndexOf(".");
+    
+    let normalized: string;
+    if (lastComma > lastDot) {
+      // Formato brasileiro: remove pontos de milhar, troca vírgula por ponto
+      normalized = cleaned.replace(/\./g, "").replace(",", ".");
+    } else {
+      // Formato americano ou sem separador de milhar
+      normalized = cleaned.replace(/,/g, "");
+    }
+    
+    const parsed = parseFloat(normalized);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
   const parseExcelFile = async (file: File): Promise<any[]> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -131,12 +161,12 @@ const Upload = () => {
             subgroup: pendingFile.subgroup,
             product_code: productCode,
             product_description: productDescription,
-            quantity: parseFloat(row[2]) || 0,
-            sales_value: parseFloat(row[3]) || 0,
-            profit: parseFloat(row[7]) || 0,
-            quantity_percentage: parseFloat(row[8]) || 0,
-            sales_percentage: parseFloat(row[9]) || 0,
-            profit_percentage: parseFloat(row[10]) || 0,
+            quantity: parseNumber(row[2]),
+            sales_value: parseNumber(row[3]),
+            profit: parseNumber(row[7]),
+            quantity_percentage: parseNumber(row[8]),
+            sales_percentage: parseNumber(row[9]),
+            profit_percentage: parseNumber(row[10]),
           });
         }
 
