@@ -75,28 +75,44 @@ const Index = () => {
   };
   const fetchData = async () => {
     setLoading(true);
-    let query = supabase.from("sales_data").select("*");
-    if (filters.year !== "all") {
-      query = query.eq("year", parseInt(filters.year));
+    
+    // Fetch all data with pagination to avoid default 1000 row limit
+    let allData: SalesData[] = [];
+    let from = 0;
+    const batchSize = 1000;
+    let hasMore = true;
+    
+    while (hasMore) {
+      let query = supabase.from("sales_data").select("*").range(from, from + batchSize - 1);
+      
+      if (filters.year !== "all") {
+        query = query.eq("year", parseInt(filters.year));
+      }
+      if (filters.month !== "all") {
+        query = query.eq("month", parseInt(filters.month));
+      }
+      if (filters.store !== "all") {
+        query = query.eq("store", filters.store);
+      }
+      if (filters.subgroup !== "all") {
+        query = query.eq("subgroup", filters.subgroup);
+      }
+      
+      const { data: salesData, error } = await query;
+      
+      if (error) {
+        console.error("Error fetching data:", error);
+        hasMore = false;
+      } else if (salesData && salesData.length > 0) {
+        allData = [...allData, ...salesData];
+        from += batchSize;
+        hasMore = salesData.length === batchSize;
+      } else {
+        hasMore = false;
+      }
     }
-    if (filters.month !== "all") {
-      query = query.eq("month", parseInt(filters.month));
-    }
-    if (filters.store !== "all") {
-      query = query.eq("store", filters.store);
-    }
-    if (filters.subgroup !== "all") {
-      query = query.eq("subgroup", filters.subgroup);
-    }
-    const {
-      data: salesData,
-      error
-    } = await query;
-    if (error) {
-      console.error("Error fetching data:", error);
-    } else {
-      setData(salesData || []);
-    }
+    
+    setData(allData);
     setLoading(false);
   };
   const handleFilterChange = (key: keyof Filters, value: string) => {
