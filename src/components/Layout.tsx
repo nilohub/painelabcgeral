@@ -29,7 +29,7 @@ export function Layout({
               <BarChart3 className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-foreground">Análise de Curva ABC</h1>
+              <h1 className="text-lg font-bold text-foreground">Análise de Curva ABC - Nilo Atacadista </h1>
               <p className="text-xs text-muted-foreground">Painel de Dados</p>
             </div>
           </Link>
