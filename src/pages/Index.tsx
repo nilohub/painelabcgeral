@@ -63,14 +63,32 @@ const Index = () => {
     fetchData();
   }, [filters]);
   const fetchFilterOptions = async () => {
-    const {
-      data: salesData
-    } = await supabase.from("sales_data").select("year, month, store, subgroup");
-    if (salesData) {
-      const years = [...new Set(salesData.map(d => d.year.toString()))].sort();
-      const months = [...new Set(salesData.map(d => d.month.toString()))].sort((a, b) => Number(a) - Number(b));
-      const stores = [...new Set(salesData.map(d => d.store))].sort();
-      const subgroups = [...new Set(salesData.map(d => d.subgroup))].sort();
+    // Fetch all filter options with pagination to avoid 1000 row limit
+    let allFilterData: { year: number; month: number; store: string; subgroup: string }[] = [];
+    let from = 0;
+    const batchSize = 1000;
+    let hasMore = true;
+    
+    while (hasMore) {
+      const { data: salesData } = await supabase
+        .from("sales_data")
+        .select("year, month, store, subgroup")
+        .range(from, from + batchSize - 1);
+      
+      if (salesData && salesData.length > 0) {
+        allFilterData = [...allFilterData, ...salesData];
+        from += batchSize;
+        hasMore = salesData.length === batchSize;
+      } else {
+        hasMore = false;
+      }
+    }
+    
+    if (allFilterData.length > 0) {
+      const years = [...new Set(allFilterData.map(d => d.year.toString()))].sort();
+      const months = [...new Set(allFilterData.map(d => d.month.toString()))].sort((a, b) => Number(a) - Number(b));
+      const stores = [...new Set(allFilterData.map(d => d.store))].sort();
+      const subgroups = [...new Set(allFilterData.map(d => d.subgroup))].sort();
       setAvailableFilters({
         years,
         months,
