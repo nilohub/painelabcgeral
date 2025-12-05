@@ -5,7 +5,6 @@ import { StatsCards } from "@/components/StatsCards";
 import { SalesCharts } from "@/components/SalesCharts";
 import { TopProductsTable } from "@/components/TopProductsTable";
 import { ProductSearch } from "@/components/ProductSearch";
-import { AdvancedAnalytics } from "@/components/AdvancedAnalytics";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, FileWarning } from "lucide-react";
 export interface SalesData {
@@ -199,7 +198,7 @@ const Index = () => {
 
         <TopProductsTable data={filteredData} />
 
-        <AdvancedAnalytics data={filteredData} />
+        
       </div>
     </Layout>;
 };
