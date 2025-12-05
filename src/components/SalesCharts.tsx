@@ -34,26 +34,27 @@ export function SalesCharts({
       profit: number;
       quantity: number;
     }> = {};
+    
+    // Initialize all months with zero values
+    for (let i = 1; i <= 12; i++) {
+      grouped[i] = { sales: 0, profit: 0, quantity: 0 };
+    }
+    
     data.forEach(item => {
-      if (!grouped[item.month]) {
-        grouped[item.month] = {
-          sales: 0,
-          profit: 0,
-          quantity: 0
-        };
+      const monthKey = Number(item.month);
+      if (monthKey >= 1 && monthKey <= 12) {
+        grouped[monthKey].sales += Number(item.sales_value) || 0;
+        grouped[monthKey].profit += Number(item.profit) || 0;
+        grouped[monthKey].quantity += Number(item.quantity) || 0;
       }
-      grouped[item.month].sales += Number(item.sales_value);
-      grouped[item.month].profit += Number(item.profit);
-      grouped[item.month].quantity += Number(item.quantity);
     });
-    return Array.from({
-      length: 12
-    }, (_, i) => ({
+    
+    return Array.from({ length: 12 }, (_, i) => ({
       month: MONTHS[i],
       monthNum: i + 1,
-      sales: grouped[i + 1]?.sales || 0,
-      profit: grouped[i + 1]?.profit || 0,
-      quantity: grouped[i + 1]?.quantity || 0
+      sales: grouped[i + 1].sales,
+      profit: grouped[i + 1].profit,
+      quantity: grouped[i + 1].quantity
     }));
   }, [data]);
   const storeData = useMemo(() => {
