@@ -104,6 +104,88 @@ export function SalesCharts({
       currency: "BRL"
     }).format(value);
   };
+  const getGrowthAnalysis = (currentMonth: number, salesGrowth: number, profitGrowth: number) => {
+    const monthName = MONTHS[currentMonth - 1];
+    
+    if (currentMonth === 1) {
+      return "Janeiro é o primeiro mês do período, sem dados anteriores para comparação.";
+    }
+
+    const salesTrend = salesGrowth >= 0 ? "crescimento" : "queda";
+    const profitTrend = profitGrowth >= 0 ? "crescimento" : "queda";
+    const salesAbs = Math.abs(salesGrowth).toFixed(1);
+    const profitAbs = Math.abs(profitGrowth).toFixed(1);
+
+    if (salesGrowth >= 0 && profitGrowth >= 0) {
+      return `${monthName} apresentou ${salesTrend} de ${salesAbs}% no faturamento e ${profitTrend} de ${profitAbs}% no lucro em relação ao mês anterior, indicando bom desempenho geral.`;
+    } else if (salesGrowth >= 0 && profitGrowth < 0) {
+      return `${monthName} apresentou ${salesTrend} de ${salesAbs}% no faturamento, porém ${profitTrend} de ${profitAbs}% no lucro, indicando possível impacto de precificação, aumento de custos ou promoções agressivas.`;
+    } else if (salesGrowth < 0 && profitGrowth >= 0) {
+      return `${monthName} apresentou ${salesTrend} de ${salesAbs}% no faturamento, mas ${profitTrend} de ${profitAbs}% no lucro, indicando melhor margem ou mix de produtos mais rentáveis.`;
+    } else {
+      return `${monthName} apresentou ${salesTrend} de ${salesAbs}% no faturamento e ${profitTrend} de ${profitAbs}% no lucro, indicando necessidade de revisão de estratégia comercial ou possível sazonalidade.`;
+    }
+  };
+
+  const MonthlyGrowthTooltip = ({
+    active,
+    payload,
+    label
+  }: any) => {
+    if (active && payload && payload.length) {
+      const currentMonthData = payload[0]?.payload;
+      const currentMonthNum = currentMonthData?.monthNum;
+      
+      let salesGrowth = 0;
+      let profitGrowth = 0;
+      
+      if (currentMonthNum > 1) {
+        const prevMonthData = monthlyData[currentMonthNum - 2];
+        const currentSales = currentMonthData?.sales || 0;
+        const prevSales = prevMonthData?.sales || 0;
+        const currentProfit = currentMonthData?.profit || 0;
+        const prevProfit = prevMonthData?.profit || 0;
+        
+        salesGrowth = prevSales > 0 ? ((currentSales - prevSales) / prevSales) * 100 : 0;
+        profitGrowth = prevProfit > 0 ? ((currentProfit - prevProfit) / prevProfit) * 100 : 0;
+      }
+
+      const analysis = getGrowthAnalysis(currentMonthNum, salesGrowth, profitGrowth);
+
+      return (
+        <div className="rounded-lg border border-border bg-card p-4 shadow-lg max-w-sm">
+          <p className="mb-2 font-semibold text-foreground text-base">{label}</p>
+          {payload.map((entry: any, index: number) => (
+            <p key={index} className="text-sm" style={{ color: entry.color }}>
+              {entry.name}: {formatTooltipCurrency(entry.value)}
+            </p>
+          ))}
+          
+          {currentMonthNum > 1 && (
+            <div className="mt-3 pt-3 border-t border-border">
+              <div className="flex gap-4 mb-2">
+                <span className={`text-xs font-medium ${salesGrowth >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                  Faturamento: {salesGrowth >= 0 ? '↑' : '↓'} {Math.abs(salesGrowth).toFixed(1)}%
+                </span>
+                <span className={`text-xs font-medium ${profitGrowth >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                  Lucro: {profitGrowth >= 0 ? '↑' : '↓'} {Math.abs(profitGrowth).toFixed(1)}%
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">{analysis}</p>
+            </div>
+          )}
+          
+          {currentMonthNum === 1 && (
+            <div className="mt-3 pt-3 border-t border-border">
+              <p className="text-xs text-muted-foreground">{analysis}</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
   const CustomTooltip = ({
     active,
     payload,
@@ -144,7 +226,7 @@ export function SalesCharts({
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                 <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={formatCurrency} />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<MonthlyGrowthTooltip />} />
                 <Legend />
                 <Area type="monotone" dataKey="sales" name="Vendas" stroke={COLORS.sales} strokeWidth={2} fill="url(#salesGradient)" />
                 <Area type="monotone" dataKey="profit" name="Lucro" stroke={COLORS.profit} strokeWidth={2} fill="url(#profitGradient)" />
