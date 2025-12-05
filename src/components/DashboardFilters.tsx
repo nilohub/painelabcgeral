@@ -59,7 +59,7 @@ export function DashboardFilters({ filters, availableFilters, onFilterChange }: 
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os Meses</SelectItem>
-              {MONTHS.filter((m) => availableFilters.months.includes(m.value)).map((month) => (
+              {MONTHS.map((month) => (
                 <SelectItem key={month.value} value={month.value}>
                   {month.label}
                 </SelectItem>
