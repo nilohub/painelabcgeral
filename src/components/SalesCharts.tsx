@@ -54,7 +54,7 @@ export function SalesCharts({
       sales: grouped[i + 1]?.sales || 0,
       profit: grouped[i + 1]?.profit || 0,
       quantity: grouped[i + 1]?.quantity || 0
-    })).filter(item => item.sales > 0 || item.profit > 0 || item.quantity > 0);
+    }));
   }, [data]);
   const storeData = useMemo(() => {
     const grouped: Record<string, {
