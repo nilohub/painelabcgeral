@@ -93,6 +93,51 @@ export function SalesCharts({
       value
     })).sort((a, b) => b.value - a.value).slice(0, 6);
   }, [data]);
+
+  // Análise Pareto (80/20) - produtos que representam 80% das vendas
+  const paretoData = useMemo(() => {
+    const productSales: Record<string, { name: string; sales: number }> = {};
+    data.forEach(item => {
+      const key = item.product_code;
+      if (!productSales[key]) {
+        productSales[key] = { name: item.product_description.substring(0, 30), sales: 0 };
+      }
+      productSales[key].sales += Number(item.sales_value);
+    });
+    
+    const sorted = Object.values(productSales).sort((a, b) => b.sales - a.sales);
+    const totalSales = sorted.reduce((sum, p) => sum + p.sales, 0);
+    
+    let cumulative = 0;
+    return sorted.slice(0, 15).map(product => {
+      cumulative += product.sales;
+      return {
+        name: product.name,
+        sales: product.sales,
+        percentual: (product.sales / totalSales) * 100,
+        cumulativo: (cumulative / totalSales) * 100
+      };
+    });
+  }, [data]);
+
+  // Margem de Lucro por Subgrupo
+  const marginBySubgroupData = useMemo(() => {
+    const grouped: Record<string, { sales: number; profit: number }> = {};
+    data.forEach(item => {
+      if (!grouped[item.subgroup]) {
+        grouped[item.subgroup] = { sales: 0, profit: 0 };
+      }
+      grouped[item.subgroup].sales += Number(item.sales_value);
+      grouped[item.subgroup].profit += Number(item.profit);
+    });
+    return Object.entries(grouped).map(([name, values]) => ({
+      name: name.length > 20 ? name.substring(0, 20) + '...' : name,
+      fullName: name,
+      margin: values.sales > 0 ? (values.profit / values.sales) * 100 : 0,
+      sales: values.sales,
+      profit: values.profit
+    })).sort((a, b) => b.margin - a.margin);
+  }, [data]);
   const formatCurrency = (value: number) => {
     if (value >= 1000000) return `R$ ${(value / 1000000).toFixed(1)}M`;
     if (value >= 1000) return `R$ ${(value / 1000).toFixed(1)}K`;
@@ -299,6 +344,94 @@ export function SalesCharts({
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Análise Pareto (80/20) */}
+      <Card className="border-border bg-card shadow-card lg:col-span-2">
+        <CardHeader>
+          <CardTitle className="text-lg">Análise Pareto - Top 15 Produtos (Curva ABC)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={paretoData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={formatCurrency} />
+                <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={10} width={150} />
+                <Tooltip 
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="rounded-lg border border-border bg-card p-3 shadow-lg">
+                          <p className="font-medium text-foreground mb-1">{data.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Vendas: {formatTooltipCurrency(data.sales)}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            % do Total: {data.percentual.toFixed(1)}%
+                          </p>
+                          <p className="text-sm font-medium" style={{ color: COLORS.accent }}>
+                            Acumulado: {data.cumulativo.toFixed(1)}%
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar dataKey="sales" name="Vendas" fill={COLORS.sales} radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2 text-center">
+            Identifica os produtos que mais contribuem para o faturamento total
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Margem de Lucro por Subgrupo */}
+      <Card className="border-border bg-card shadow-card lg:col-span-2">
+        <CardHeader>
+          <CardTitle className="text-lg">Margem de Lucro por Subgrupo (%)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[350px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={marginBySubgroupData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} angle={-45} textAnchor="end" height={80} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(v) => `${v.toFixed(0)}%`} />
+                <Tooltip 
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="rounded-lg border border-border bg-card p-3 shadow-lg">
+                          <p className="font-medium text-foreground mb-1">{data.fullName}</p>
+                          <p className="text-sm" style={{ color: COLORS.profit }}>
+                            Margem: {data.margin.toFixed(1)}%
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Vendas: {formatTooltipCurrency(data.sales)}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Lucro: {formatTooltipCurrency(data.profit)}
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar dataKey="margin" name="Margem %" fill={COLORS.profit} radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2 text-center">
+            Compara a rentabilidade (lucro/vendas) entre os diferentes subgrupos de produtos
+          </p>
         </CardContent>
       </Card>
     </div>;
