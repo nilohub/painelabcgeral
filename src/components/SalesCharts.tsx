@@ -1,7 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area, ScatterChart, Scatter, ZAxis, ReferenceLine } from "recharts";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Settings2 } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { SalesData } from "@/pages/Index";
 
 interface SalesChartsProps {
@@ -140,6 +144,11 @@ export function SalesCharts({
     })).sort((a, b) => b.margin - a.margin);
   }, [data]);
 
+  // BCG Matrix customization state
+  const [bcgSettingsOpen, setBcgSettingsOpen] = useState(false);
+  const [customMarginThreshold, setCustomMarginThreshold] = useState<number | null>(null);
+  const [customSalesThreshold, setCustomSalesThreshold] = useState<number | null>(null);
+
   // Matriz BCG de Produtos (Volume x Margem)
   const bcgMatrixData = useMemo(() => {
     const productData: Record<string, { name: string; code: string; sales: number; profit: number; quantity: number }> = {};
@@ -164,20 +173,29 @@ export function SalesCharts({
       margin: p.sales > 0 ? (p.profit / p.sales) * 100 : 0
     }));
     
-    const avgMargin = products.reduce((sum, p) => sum + p.margin, 0) / products.length;
-    const avgSales = products.reduce((sum, p) => sum + p.sales, 0) / products.length;
+    const calculatedAvgMargin = products.length > 0 ? products.reduce((sum, p) => sum + p.margin, 0) / products.length : 0;
+    const calculatedAvgSales = products.length > 0 ? products.reduce((sum, p) => sum + p.sales, 0) / products.length : 0;
+    const maxSales = Math.max(...products.map(p => p.sales), 1);
+    const maxMargin = Math.max(...products.map(p => p.margin), 1);
+    
+    const marginThreshold = customMarginThreshold ?? calculatedAvgMargin;
+    const salesThreshold = customSalesThreshold ?? calculatedAvgSales;
     
     return {
       products: products.slice(0, 50).map(p => ({
         ...p,
-        quadrant: p.margin >= avgMargin 
-          ? (p.sales >= avgSales ? 'Estrela' : 'Interrogação')
-          : (p.sales >= avgSales ? 'Vaca Leiteira' : 'Abacaxi')
+        quadrant: p.margin >= marginThreshold 
+          ? (p.sales >= salesThreshold ? 'Estrela' : 'Interrogação')
+          : (p.sales >= salesThreshold ? 'Vaca Leiteira' : 'Abacaxi')
       })),
-      avgMargin,
-      avgSales
+      avgMargin: calculatedAvgMargin,
+      avgSales: calculatedAvgSales,
+      marginThreshold,
+      salesThreshold,
+      maxSales,
+      maxMargin
     };
-  }, [data]);
+  }, [data, customMarginThreshold, customSalesThreshold]);
 
   // Ticket Médio por Loja e Subgrupo
   const ticketMedioData = useMemo(() => {
@@ -566,10 +584,73 @@ export function SalesCharts({
 
       {/* Matriz BCG de Produtos */}
       <Card className="border-border bg-card shadow-card lg:col-span-2">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg">Matriz BCG - Volume x Margem de Lucro</CardTitle>
+          <Collapsible open={bcgSettingsOpen} onOpenChange={setBcgSettingsOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-2">
+                <Settings2 className="h-4 w-4" />
+                Personalizar
+              </Button>
+            </CollapsibleTrigger>
+          </Collapsible>
         </CardHeader>
         <CardContent>
+          <Collapsible open={bcgSettingsOpen} onOpenChange={setBcgSettingsOpen}>
+            <CollapsibleContent className="mb-4 p-4 border border-border rounded-lg bg-muted/30">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Limite de Margem (%)</Label>
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {(customMarginThreshold ?? bcgMatrixData.avgMargin).toFixed(1)}%
+                    </span>
+                  </div>
+                  <Slider
+                    value={[customMarginThreshold ?? bcgMatrixData.avgMargin]}
+                    onValueChange={(value) => setCustomMarginThreshold(value[0])}
+                    min={0}
+                    max={Math.min(bcgMatrixData.maxMargin, 100)}
+                    step={0.5}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Média calculada: {bcgMatrixData.avgMargin.toFixed(1)}%
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Limite de Vendas (R$)</Label>
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {formatTooltipCurrency(customSalesThreshold ?? bcgMatrixData.avgSales)}
+                    </span>
+                  </div>
+                  <Slider
+                    value={[customSalesThreshold ?? bcgMatrixData.avgSales]}
+                    onValueChange={(value) => setCustomSalesThreshold(value[0])}
+                    min={0}
+                    max={bcgMatrixData.maxSales}
+                    step={bcgMatrixData.maxSales / 100}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Média calculada: {formatTooltipCurrency(bcgMatrixData.avgSales)}
+                  </p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    setCustomMarginThreshold(null);
+                    setCustomSalesThreshold(null);
+                  }}
+                  className="w-full"
+                >
+                  Restaurar Valores Padrão
+                </Button>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
           <div className="h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
               <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
@@ -593,8 +674,8 @@ export function SalesCharts({
                   label={{ value: 'Margem %', angle: -90, position: 'insideLeft', fill: 'hsl(var(--muted-foreground))' }}
                 />
                 <ZAxis type="number" dataKey="quantity" range={[50, 400]} />
-                <ReferenceLine x={bcgMatrixData.avgSales} stroke="hsl(var(--muted-foreground))" strokeDasharray="5 5" />
-                <ReferenceLine y={bcgMatrixData.avgMargin} stroke="hsl(var(--muted-foreground))" strokeDasharray="5 5" />
+                <ReferenceLine x={bcgMatrixData.salesThreshold} stroke="hsl(var(--primary))" strokeDasharray="5 5" strokeWidth={2} />
+                <ReferenceLine y={bcgMatrixData.marginThreshold} stroke="hsl(var(--primary))" strokeDasharray="5 5" strokeWidth={2} />
                 <Tooltip 
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
