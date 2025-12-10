@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area, ScatterChart, Scatter, ZAxis, ReferenceLine } from "recharts";
+import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import type { SalesData } from "@/pages/Index";
 
 interface SalesChartsProps {
@@ -137,6 +138,134 @@ export function SalesCharts({
       sales: values.sales,
       profit: values.profit
     })).sort((a, b) => b.margin - a.margin);
+  }, [data]);
+
+  // Matriz BCG de Produtos (Volume x Margem)
+  const bcgMatrixData = useMemo(() => {
+    const productData: Record<string, { name: string; code: string; sales: number; profit: number; quantity: number }> = {};
+    data.forEach(item => {
+      const key = item.product_code;
+      if (!productData[key]) {
+        productData[key] = { 
+          name: item.product_description.substring(0, 25), 
+          code: item.product_code,
+          sales: 0, 
+          profit: 0, 
+          quantity: 0 
+        };
+      }
+      productData[key].sales += Number(item.sales_value);
+      productData[key].profit += Number(item.profit);
+      productData[key].quantity += Number(item.quantity);
+    });
+    
+    const products = Object.values(productData).map(p => ({
+      ...p,
+      margin: p.sales > 0 ? (p.profit / p.sales) * 100 : 0
+    }));
+    
+    const avgMargin = products.reduce((sum, p) => sum + p.margin, 0) / products.length;
+    const avgSales = products.reduce((sum, p) => sum + p.sales, 0) / products.length;
+    
+    return {
+      products: products.slice(0, 50).map(p => ({
+        ...p,
+        quadrant: p.margin >= avgMargin 
+          ? (p.sales >= avgSales ? 'Estrela' : 'Interrogação')
+          : (p.sales >= avgSales ? 'Vaca Leiteira' : 'Abacaxi')
+      })),
+      avgMargin,
+      avgSales
+    };
+  }, [data]);
+
+  // Ticket Médio por Loja e Subgrupo
+  const ticketMedioData = useMemo(() => {
+    const byStore: Record<string, { sales: number; quantity: number }> = {};
+    const bySubgroup: Record<string, { sales: number; quantity: number }> = {};
+    
+    data.forEach(item => {
+      // Por loja
+      if (!byStore[item.store]) {
+        byStore[item.store] = { sales: 0, quantity: 0 };
+      }
+      byStore[item.store].sales += Number(item.sales_value);
+      byStore[item.store].quantity += Number(item.quantity);
+      
+      // Por subgrupo
+      if (!bySubgroup[item.subgroup]) {
+        bySubgroup[item.subgroup] = { sales: 0, quantity: 0 };
+      }
+      bySubgroup[item.subgroup].sales += Number(item.sales_value);
+      bySubgroup[item.subgroup].quantity += Number(item.quantity);
+    });
+    
+    return {
+      byStore: Object.entries(byStore).map(([store, v]) => ({
+        name: `Loja ${store}`,
+        ticketMedio: v.quantity > 0 ? v.sales / v.quantity : 0,
+        sales: v.sales,
+        quantity: v.quantity
+      })).sort((a, b) => b.ticketMedio - a.ticketMedio),
+      bySubgroup: Object.entries(bySubgroup).map(([name, v]) => ({
+        name: name.length > 15 ? name.substring(0, 15) + '...' : name,
+        fullName: name,
+        ticketMedio: v.quantity > 0 ? v.sales / v.quantity : 0,
+        sales: v.sales,
+        quantity: v.quantity
+      })).sort((a, b) => b.ticketMedio - a.ticketMedio).slice(0, 10)
+    };
+  }, [data]);
+
+  // Produtos em Alta/Queda (comparando meses)
+  const trendingProductsData = useMemo(() => {
+    const monthlyProductSales: Record<string, Record<number, number>> = {};
+    
+    data.forEach(item => {
+      const key = item.product_code;
+      const month = Number(item.month);
+      if (!monthlyProductSales[key]) {
+        monthlyProductSales[key] = {};
+      }
+      if (!monthlyProductSales[key][month]) {
+        monthlyProductSales[key][month] = 0;
+      }
+      monthlyProductSales[key][month] += Number(item.sales_value);
+    });
+    
+    const productTrends = Object.entries(monthlyProductSales).map(([code, months]) => {
+      const monthValues = Object.entries(months)
+        .map(([m, v]) => ({ month: Number(m), value: v }))
+        .sort((a, b) => a.month - b.month);
+      
+      if (monthValues.length < 2) {
+        return null;
+      }
+      
+      // Calcular tendência usando os últimos meses disponíveis
+      const recentMonths = monthValues.slice(-3);
+      const firstValue = recentMonths[0]?.value || 0;
+      const lastValue = recentMonths[recentMonths.length - 1]?.value || 0;
+      const growth = firstValue > 0 ? ((lastValue - firstValue) / firstValue) * 100 : 0;
+      const totalSales = monthValues.reduce((sum, m) => sum + m.value, 0);
+      
+      const productInfo = data.find(d => d.product_code === code);
+      
+      return {
+        code,
+        name: productInfo?.product_description.substring(0, 30) || code,
+        growth,
+        totalSales,
+        trend: growth > 10 ? 'up' : growth < -10 ? 'down' : 'stable'
+      };
+    }).filter(Boolean) as { code: string; name: string; growth: number; totalSales: number; trend: string }[];
+    
+    const sorted = productTrends.sort((a, b) => Math.abs(b.growth) - Math.abs(a.growth));
+    
+    return {
+      rising: sorted.filter(p => p.trend === 'up').slice(0, 5),
+      falling: sorted.filter(p => p.trend === 'down').slice(0, 5)
+    };
   }, [data]);
   const formatCurrency = (value: number) => {
     if (value >= 1000000) return `R$ ${(value / 1000000).toFixed(1)}M`;
@@ -431,6 +560,228 @@ export function SalesCharts({
           </div>
           <p className="text-xs text-muted-foreground mt-2 text-center">
             Compara a rentabilidade (lucro/vendas) entre os diferentes subgrupos de produtos
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Matriz BCG de Produtos */}
+      <Card className="border-border bg-card shadow-card lg:col-span-2">
+        <CardHeader>
+          <CardTitle className="text-lg">Matriz BCG - Volume x Margem de Lucro</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis 
+                  type="number" 
+                  dataKey="sales" 
+                  name="Vendas" 
+                  stroke="hsl(var(--muted-foreground))" 
+                  fontSize={12}
+                  tickFormatter={formatCurrency}
+                  label={{ value: 'Volume de Vendas', position: 'bottom', offset: 0, fill: 'hsl(var(--muted-foreground))' }}
+                />
+                <YAxis 
+                  type="number" 
+                  dataKey="margin" 
+                  name="Margem" 
+                  stroke="hsl(var(--muted-foreground))" 
+                  fontSize={12}
+                  tickFormatter={(v) => `${v.toFixed(0)}%`}
+                  label={{ value: 'Margem %', angle: -90, position: 'insideLeft', fill: 'hsl(var(--muted-foreground))' }}
+                />
+                <ZAxis type="number" dataKey="quantity" range={[50, 400]} />
+                <ReferenceLine x={bcgMatrixData.avgSales} stroke="hsl(var(--muted-foreground))" strokeDasharray="5 5" />
+                <ReferenceLine y={bcgMatrixData.avgMargin} stroke="hsl(var(--muted-foreground))" strokeDasharray="5 5" />
+                <Tooltip 
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="rounded-lg border border-border bg-card p-3 shadow-lg">
+                          <p className="font-medium text-foreground mb-1">{data.name}</p>
+                          <p className="text-xs text-muted-foreground">Código: {data.code}</p>
+                          <p className="text-sm" style={{ color: COLORS.sales }}>
+                            Vendas: {formatTooltipCurrency(data.sales)}
+                          </p>
+                          <p className="text-sm" style={{ color: COLORS.profit }}>
+                            Margem: {data.margin.toFixed(1)}%
+                          </p>
+                          <p className="text-sm font-medium mt-1" style={{ 
+                            color: data.quadrant === 'Estrela' ? COLORS.profit : 
+                                   data.quadrant === 'Vaca Leiteira' ? COLORS.sales :
+                                   data.quadrant === 'Interrogação' ? COLORS.accent : 'hsl(var(--destructive))'
+                          }}>
+                            Quadrante: {data.quadrant}
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Scatter 
+                  name="Produtos" 
+                  data={bcgMatrixData.products} 
+                  fill={COLORS.sales}
+                  shape={(props: any) => {
+                    const { cx, cy, payload } = props;
+                    const color = payload.quadrant === 'Estrela' ? COLORS.profit : 
+                                 payload.quadrant === 'Vaca Leiteira' ? COLORS.sales :
+                                 payload.quadrant === 'Interrogação' ? COLORS.accent : 'hsl(var(--destructive))';
+                    return <circle cx={cx} cy={cy} r={6} fill={color} fillOpacity={0.7} stroke={color} />;
+                  }}
+                />
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex justify-center gap-4 mt-2 text-xs">
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS.profit }}></span> Estrela</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS.sales }}></span> Vaca Leiteira</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS.accent }}></span> Interrogação</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-destructive"></span> Abacaxi</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Ticket Médio */}
+      <Card className="border-border bg-card shadow-card">
+        <CardHeader>
+          <CardTitle className="text-lg">Ticket Médio por Loja</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={ticketMedioData.byStore} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={formatCurrency} />
+                <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} width={70} />
+                <Tooltip 
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="rounded-lg border border-border bg-card p-3 shadow-lg">
+                          <p className="font-medium text-foreground mb-1">{data.name}</p>
+                          <p className="text-sm" style={{ color: COLORS.accent }}>
+                            Ticket Médio: {formatTooltipCurrency(data.ticketMedio)}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Total Vendas: {formatTooltipCurrency(data.sales)}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Qtd. Vendida: {data.quantity.toLocaleString('pt-BR')}
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar dataKey="ticketMedio" name="Ticket Médio" fill={COLORS.accent} radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Ticket Médio por Subgrupo */}
+      <Card className="border-border bg-card shadow-card">
+        <CardHeader>
+          <CardTitle className="text-lg">Ticket Médio por Subgrupo</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={ticketMedioData.bySubgroup}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} angle={-45} textAnchor="end" height={70} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={formatCurrency} />
+                <Tooltip 
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="rounded-lg border border-border bg-card p-3 shadow-lg">
+                          <p className="font-medium text-foreground mb-1">{data.fullName}</p>
+                          <p className="text-sm" style={{ color: COLORS.quantity }}>
+                            Ticket Médio: {formatTooltipCurrency(data.ticketMedio)}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Total Vendas: {formatTooltipCurrency(data.sales)}
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar dataKey="ticketMedio" name="Ticket Médio" fill={COLORS.quantity} radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Produtos em Alta/Queda */}
+      <Card className="border-border bg-card shadow-card lg:col-span-2">
+        <CardHeader>
+          <CardTitle className="text-lg">Produtos em Tendência (Alta/Queda)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Produtos em Alta */}
+            <div>
+              <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-emerald-500" />
+                Em Alta
+              </h4>
+              <div className="space-y-2">
+                {trendingProductsData.rising.length > 0 ? trendingProductsData.rising.map((product, index) => (
+                  <div key={product.code} className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{product.name}</p>
+                      <p className="text-xs text-muted-foreground">{formatTooltipCurrency(product.totalSales)}</p>
+                    </div>
+                    <div className="flex items-center gap-1 text-emerald-500 font-medium text-sm">
+                      <TrendingUp className="w-4 h-4" />
+                      +{product.growth.toFixed(0)}%
+                    </div>
+                  </div>
+                )) : (
+                  <p className="text-sm text-muted-foreground">Dados insuficientes para análise</p>
+                )}
+              </div>
+            </div>
+
+            {/* Produtos em Queda */}
+            <div>
+              <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                <TrendingDown className="w-4 h-4 text-red-500" />
+                Em Queda
+              </h4>
+              <div className="space-y-2">
+                {trendingProductsData.falling.length > 0 ? trendingProductsData.falling.map((product, index) => (
+                  <div key={product.code} className="flex items-center justify-between p-2 rounded-lg bg-red-500/10 border border-red-500/20">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{product.name}</p>
+                      <p className="text-xs text-muted-foreground">{formatTooltipCurrency(product.totalSales)}</p>
+                    </div>
+                    <div className="flex items-center gap-1 text-red-500 font-medium text-sm">
+                      <TrendingDown className="w-4 h-4" />
+                      {product.growth.toFixed(0)}%
+                    </div>
+                  </div>
+                )) : (
+                  <p className="text-sm text-muted-foreground">Dados insuficientes para análise</p>
+                )}
+              </div>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-4 text-center">
+            Análise baseada na variação de vendas nos últimos meses disponíveis
           </p>
         </CardContent>
       </Card>
