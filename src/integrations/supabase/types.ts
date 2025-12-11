@@ -14,6 +14,104 @@ export type Database = {
   }
   public: {
     Tables: {
+      offer_products: {
+        Row: {
+          cpf_limit: number | null
+          created_at: string
+          description: string
+          id: string
+          main_code: string
+          management_cost: number
+          margin: number | null
+          offer_id: string
+          other_codes: string | null
+          price_agua_boa: number | null
+          price_jussara: number | null
+          price_querencia: number | null
+          price_vila_shopping: number | null
+          price_xavantina: number | null
+          promo_price: number
+          promo_type: string | null
+          session_name: string | null
+        }
+        Insert: {
+          cpf_limit?: number | null
+          created_at?: string
+          description: string
+          id?: string
+          main_code: string
+          management_cost?: number
+          margin?: number | null
+          offer_id: string
+          other_codes?: string | null
+          price_agua_boa?: number | null
+          price_jussara?: number | null
+          price_querencia?: number | null
+          price_vila_shopping?: number | null
+          price_xavantina?: number | null
+          promo_price: number
+          promo_type?: string | null
+          session_name?: string | null
+        }
+        Update: {
+          cpf_limit?: number | null
+          created_at?: string
+          description?: string
+          id?: string
+          main_code?: string
+          management_cost?: number
+          margin?: number | null
+          offer_id?: string
+          other_codes?: string | null
+          price_agua_boa?: number | null
+          price_jussara?: number | null
+          price_querencia?: number | null
+          price_vila_shopping?: number | null
+          price_xavantina?: number | null
+          promo_price?: number
+          promo_type?: string | null
+          session_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offer_products_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "offers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      offers: {
+        Row: {
+          created_at: string
+          end_date: string
+          file_name: string
+          id: string
+          lamina_number: number
+          offer_type: string
+          start_date: string
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          file_name: string
+          id?: string
+          lamina_number: number
+          offer_type: string
+          start_date: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          file_name?: string
+          id?: string
+          lamina_number?: number
+          offer_type?: string
+          start_date?: string
+        }
+        Relationships: []
+      }
       sales_data: {
         Row: {
           created_at: string

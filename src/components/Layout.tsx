@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Upload, History, BarChart3 } from "lucide-react";
+import { Upload, History, BarChart3, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 interface LayoutProps {
   children: React.ReactNode;
@@ -16,6 +16,10 @@ const navItems = [{
   path: "/historico",
   label: "Histórico",
   icon: History
+}, {
+  path: "/ofertas",
+  label: "Ofertas",
+  icon: Tag
 }];
 export function Layout({
   children
