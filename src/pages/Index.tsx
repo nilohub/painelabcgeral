@@ -43,7 +43,6 @@ const Index = () => {
     const term = searchTerm.toLowerCase();
     return data.filter(item => item.product_code.toLowerCase().includes(term) || item.product_description.toLowerCase().includes(term));
   }, [data, searchTerm]);
-
   const matchedProductName = useMemo(() => {
     if (!searchTerm.trim() || filteredData.length === 0) return undefined;
     const firstMatch = filteredData[0];
@@ -64,17 +63,19 @@ const Index = () => {
   }, [filters]);
   const fetchFilterOptions = async () => {
     // Fetch all filter options with pagination to avoid 1000 row limit
-    let allFilterData: { year: number; month: number; store: string; subgroup: string }[] = [];
+    let allFilterData: {
+      year: number;
+      month: number;
+      store: string;
+      subgroup: string;
+    }[] = [];
     let from = 0;
     const batchSize = 1000;
     let hasMore = true;
-    
     while (hasMore) {
-      const { data: salesData } = await supabase
-        .from("sales_data")
-        .select("year, month, store, subgroup")
-        .range(from, from + batchSize - 1);
-      
+      const {
+        data: salesData
+      } = await supabase.from("sales_data").select("year, month, store, subgroup").range(from, from + batchSize - 1);
       if (salesData && salesData.length > 0) {
         allFilterData = [...allFilterData, ...salesData];
         from += batchSize;
@@ -83,7 +84,6 @@ const Index = () => {
         hasMore = false;
       }
     }
-    
     if (allFilterData.length > 0) {
       const years = [...new Set(allFilterData.map(d => d.year.toString()))].sort();
       const months = [...new Set(allFilterData.map(d => d.month.toString()))].sort((a, b) => Number(a) - Number(b));
@@ -99,16 +99,14 @@ const Index = () => {
   };
   const fetchData = async () => {
     setLoading(true);
-    
+
     // Fetch all data with pagination to avoid default 1000 row limit
     let allData: SalesData[] = [];
     let from = 0;
     const batchSize = 1000;
     let hasMore = true;
-    
     while (hasMore) {
       let query = supabase.from("sales_data").select("*").range(from, from + batchSize - 1);
-      
       if (filters.year !== "all") {
         query = query.eq("year", parseInt(filters.year));
       }
@@ -121,9 +119,10 @@ const Index = () => {
       if (filters.subgroup !== "all") {
         query = query.eq("subgroup", filters.subgroup);
       }
-      
-      const { data: salesData, error } = await query;
-      
+      const {
+        data: salesData,
+        error
+      } = await query;
       if (error) {
         console.error("Error fetching data:", error);
         hasMore = false;
@@ -135,7 +134,6 @@ const Index = () => {
         hasMore = false;
       }
     }
-    
     setData(allData);
     setLoading(false);
   };
@@ -178,18 +176,13 @@ const Index = () => {
   return <Layout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <h1 className="text-2xl font-bold text-foreground">Dashboard -Análise de Curva ABC </h1>
           <p className="text-muted-foreground">Análise completa dos dados de vendas por período</p>
         </div>
 
         <div className="flex flex-col md:flex-row gap-4 md:items-start md:justify-between">
           <DashboardFilters filters={filters} availableFilters={availableFilters} onFilterChange={handleFilterChange} />
-          <ProductSearch 
-            value={searchTerm} 
-            onChange={setSearchTerm} 
-            resultCount={searchTerm ? filteredData.length : undefined}
-            matchedProduct={matchedProductName}
-          />
+          <ProductSearch value={searchTerm} onChange={setSearchTerm} resultCount={searchTerm ? filteredData.length : undefined} matchedProduct={matchedProductName} />
         </div>
 
         <StatsCards data={filteredData} />
