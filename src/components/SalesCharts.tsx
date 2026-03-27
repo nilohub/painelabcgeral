@@ -39,35 +39,41 @@ const PIE_COLORS = [
 export function SalesCharts({
   data
 }: SalesChartsProps) {
+  const availableYears = useMemo(() => {
+    const years = [...new Set(data.map(d => d.year))].sort();
+    return years;
+  }, [data]);
+
   const monthlyData = useMemo(() => {
-    const grouped: Record<number, {
-      sales: number;
-      profit: number;
-      quantity: number;
-    }> = {};
+    const grouped: Record<string, Record<number, { sales: number; profit: number; quantity: number }>> = {};
     
-    // Initialize all months with zero values
-    for (let i = 1; i <= 12; i++) {
-      grouped[i] = { sales: 0, profit: 0, quantity: 0 };
-    }
-    
-    data.forEach(item => {
-      const monthKey = Number(item.month);
-      if (monthKey >= 1 && monthKey <= 12) {
-        grouped[monthKey].sales += Number(item.sales_value) || 0;
-        grouped[monthKey].profit += Number(item.profit) || 0;
-        grouped[monthKey].quantity += Number(item.quantity) || 0;
+    availableYears.forEach(year => {
+      grouped[year] = {};
+      for (let i = 1; i <= 12; i++) {
+        grouped[year][i] = { sales: 0, profit: 0, quantity: 0 };
       }
     });
     
-    return Array.from({ length: 12 }, (_, i) => ({
-      month: MONTHS[i],
-      monthNum: i + 1,
-      sales: grouped[i + 1].sales,
-      profit: grouped[i + 1].profit,
-      quantity: grouped[i + 1].quantity
-    }));
-  }, [data]);
+    data.forEach(item => {
+      const monthKey = Number(item.month);
+      const year = item.year;
+      if (monthKey >= 1 && monthKey <= 12 && grouped[year]) {
+        grouped[year][monthKey].sales += Number(item.sales_value) || 0;
+        grouped[year][monthKey].profit += Number(item.profit) || 0;
+        grouped[year][monthKey].quantity += Number(item.quantity) || 0;
+      }
+    });
+    
+    return Array.from({ length: 12 }, (_, i) => {
+      const row: any = { month: MONTHS[i], monthNum: i + 1 };
+      availableYears.forEach(year => {
+        row[`sales_${year}`] = grouped[year][i + 1].sales;
+        row[`profit_${year}`] = grouped[year][i + 1].profit;
+        row[`quantity_${year}`] = grouped[year][i + 1].quantity;
+      });
+      return row;
+    });
+  }, [data, availableYears]);
   const storeData = useMemo(() => {
     const grouped: Record<string, {
       sales: number;
