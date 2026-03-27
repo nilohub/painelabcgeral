@@ -110,7 +110,43 @@ const History = () => {
     }
   };
 
-  const handleDeleteAll = async () => {
+  const handleDeleteSubgroup = async () => {
+    if (!selectedSubgroup) return;
+    setDeletingSubgroup(true);
+    try {
+      const { error: salesError } = await supabase
+        .from("sales_data")
+        .delete()
+        .eq("subgroup", selectedSubgroup);
+
+      if (salesError) throw salesError;
+
+      const { error: historyError } = await supabase
+        .from("upload_history")
+        .delete()
+        .eq("subgroup", selectedSubgroup);
+
+      if (historyError) throw historyError;
+
+      toast({
+        title: "Subgrupo excluído",
+        description: `Todos os registros do subgrupo "${selectedSubgroup}" foram removidos`,
+      });
+
+      setSelectedSubgroup("");
+      fetchUploads();
+    } catch (error) {
+      console.error("Delete subgroup error:", error);
+      toast({
+        title: "Erro ao excluir",
+        description: "Não foi possível excluir o subgrupo",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingSubgroup(false);
+    }
+  };
+
     setDeletingAll(true);
     try {
       const { error: salesError } = await supabase
