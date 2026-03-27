@@ -47,7 +47,10 @@ const History = () => {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deletingAll, setDeletingAll] = useState(false);
+  const [deletingSubgroup, setDeletingSubgroup] = useState(false);
+  const [selectedSubgroup, setSelectedSubgroup] = useState<string>("");
 
+  const uniqueSubgroups = [...new Set(uploads.map((u) => u.subgroup))].sort();
   useEffect(() => {
     fetchUploads();
   }, []);
