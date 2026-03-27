@@ -461,7 +461,10 @@ export function SalesCharts({
                 <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                 <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="quantity" name="Quantidade" fill={COLORS.quantity} radius={[4, 4, 0, 0]} />
+                <Legend />
+                {availableYears.map((year, yi) => (
+                  <Bar key={year} dataKey={`quantity_${year}`} name={`Qtd ${year}`} fill={YEAR_COLORS[yi % YEAR_COLORS.length].quantity} radius={[4, 4, 0, 0]} />
+                ))}
               </BarChart>
             </ResponsiveContainer>
           </div>
