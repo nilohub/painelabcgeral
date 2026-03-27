@@ -22,6 +22,12 @@ const COLORS = {
   accent: "hsl(var(--chart-accent))"
 };
 
+const YEAR_COLORS = [
+  { sales: "hsl(var(--chart-sales))", profit: "hsl(var(--chart-profit))", quantity: "hsl(var(--chart-quantity))" },
+  { sales: "hsl(var(--chart-accent))", profit: "hsl(var(--primary))", quantity: "hsl(var(--destructive))" },
+  { sales: "hsl(var(--muted-foreground))", profit: "hsl(var(--secondary-foreground))", quantity: "hsl(var(--accent-foreground))" },
+];
+
 const PIE_COLORS = [
   "hsl(var(--chart-sales))",
   "hsl(var(--chart-profit))",
