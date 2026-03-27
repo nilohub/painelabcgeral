@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area, ScatterChart, Scatter, ZAxis, ReferenceLine } from "recharts";
 import { TrendingUp, TrendingDown, Minus, Settings2 } from "lucide-react";
@@ -22,6 +22,12 @@ const COLORS = {
   accent: "hsl(var(--chart-accent))"
 };
 
+const YEAR_COLORS = [
+  { sales: "hsl(var(--chart-sales))", profit: "hsl(var(--chart-profit))", quantity: "hsl(var(--chart-quantity))" },
+  { sales: "hsl(var(--chart-accent))", profit: "hsl(var(--primary))", quantity: "hsl(var(--destructive))" },
+  { sales: "hsl(var(--muted-foreground))", profit: "hsl(var(--secondary-foreground))", quantity: "hsl(var(--accent-foreground))" },
+];
+
 const PIE_COLORS = [
   "hsl(var(--chart-sales))",
   "hsl(var(--chart-profit))",
@@ -33,35 +39,41 @@ const PIE_COLORS = [
 export function SalesCharts({
   data
 }: SalesChartsProps) {
+  const availableYears = useMemo(() => {
+    const years = [...new Set(data.map(d => d.year))].sort();
+    return years;
+  }, [data]);
+
   const monthlyData = useMemo(() => {
-    const grouped: Record<number, {
-      sales: number;
-      profit: number;
-      quantity: number;
-    }> = {};
+    const grouped: Record<string, Record<number, { sales: number; profit: number; quantity: number }>> = {};
     
-    // Initialize all months with zero values
-    for (let i = 1; i <= 12; i++) {
-      grouped[i] = { sales: 0, profit: 0, quantity: 0 };
-    }
-    
-    data.forEach(item => {
-      const monthKey = Number(item.month);
-      if (monthKey >= 1 && monthKey <= 12) {
-        grouped[monthKey].sales += Number(item.sales_value) || 0;
-        grouped[monthKey].profit += Number(item.profit) || 0;
-        grouped[monthKey].quantity += Number(item.quantity) || 0;
+    availableYears.forEach(year => {
+      grouped[year] = {};
+      for (let i = 1; i <= 12; i++) {
+        grouped[year][i] = { sales: 0, profit: 0, quantity: 0 };
       }
     });
     
-    return Array.from({ length: 12 }, (_, i) => ({
-      month: MONTHS[i],
-      monthNum: i + 1,
-      sales: grouped[i + 1].sales,
-      profit: grouped[i + 1].profit,
-      quantity: grouped[i + 1].quantity
-    }));
-  }, [data]);
+    data.forEach(item => {
+      const monthKey = Number(item.month);
+      const year = item.year;
+      if (monthKey >= 1 && monthKey <= 12 && grouped[year]) {
+        grouped[year][monthKey].sales += Number(item.sales_value) || 0;
+        grouped[year][monthKey].profit += Number(item.profit) || 0;
+        grouped[year][monthKey].quantity += Number(item.quantity) || 0;
+      }
+    });
+    
+    return Array.from({ length: 12 }, (_, i) => {
+      const row: any = { month: MONTHS[i], monthNum: i + 1 };
+      availableYears.forEach(year => {
+        row[`sales_${year}`] = grouped[year][i + 1].sales;
+        row[`profit_${year}`] = grouped[year][i + 1].profit;
+        row[`quantity_${year}`] = grouped[year][i + 1].quantity;
+      });
+      return row;
+    });
+  }, [data, availableYears]);
   const storeData = useMemo(() => {
     const grouped: Record<string, {
       sales: number;
@@ -325,53 +337,14 @@ export function SalesCharts({
     label
   }: any) => {
     if (active && payload && payload.length) {
-      const currentMonthData = payload[0]?.payload;
-      const currentMonthNum = currentMonthData?.monthNum;
-      
-      let salesGrowth = 0;
-      let profitGrowth = 0;
-      
-      if (currentMonthNum > 1) {
-        const prevMonthData = monthlyData[currentMonthNum - 2];
-        const currentSales = currentMonthData?.sales || 0;
-        const prevSales = prevMonthData?.sales || 0;
-        const currentProfit = currentMonthData?.profit || 0;
-        const prevProfit = prevMonthData?.profit || 0;
-        
-        salesGrowth = prevSales > 0 ? ((currentSales - prevSales) / prevSales) * 100 : 0;
-        profitGrowth = prevProfit > 0 ? ((currentProfit - prevProfit) / prevProfit) * 100 : 0;
-      }
-
-      const analysis = getGrowthAnalysis(currentMonthNum, salesGrowth, profitGrowth);
-
       return (
         <div className="rounded-lg border border-border bg-card p-4 shadow-lg max-w-sm">
           <p className="mb-2 font-semibold text-foreground text-base">{label}</p>
           {payload.map((entry: any, index: number) => (
             <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.name}: {formatTooltipCurrency(entry.value)}
+              {entry.name}: {entry.name.startsWith("Qtd") ? Number(entry.value).toLocaleString("pt-BR") : formatTooltipCurrency(entry.value)}
             </p>
           ))}
-          
-          {currentMonthNum > 1 && (
-            <div className="mt-3 pt-3 border-t border-border">
-              <div className="flex gap-4 mb-2">
-                <span className={`text-xs font-medium ${salesGrowth >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                  Faturamento: {salesGrowth >= 0 ? '↑' : '↓'} {Math.abs(salesGrowth).toFixed(1)}%
-                </span>
-                <span className={`text-xs font-medium ${profitGrowth >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                  Lucro: {profitGrowth >= 0 ? '↑' : '↓'} {Math.abs(profitGrowth).toFixed(1)}%
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">{analysis}</p>
-            </div>
-          )}
-          
-          {currentMonthNum === 1 && (
-            <div className="mt-3 pt-3 border-t border-border">
-              <p className="text-xs text-muted-foreground">{analysis}</p>
-            </div>
-          )}
         </div>
       );
     }
@@ -406,22 +379,30 @@ export function SalesCharts({
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={monthlyData}>
                 <defs>
-                  <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={COLORS.sales} stopOpacity={0.3} />
-                    <stop offset="95%" stopColor={COLORS.sales} stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={COLORS.profit} stopOpacity={0.3} />
-                    <stop offset="95%" stopColor={COLORS.profit} stopOpacity={0} />
-                  </linearGradient>
+                  {availableYears.map((year, yi) => (
+                    <React.Fragment key={year}>
+                      <linearGradient id={`salesGradient_${year}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={YEAR_COLORS[yi % YEAR_COLORS.length].sales} stopOpacity={0.3} />
+                        <stop offset="95%" stopColor={YEAR_COLORS[yi % YEAR_COLORS.length].sales} stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id={`profitGradient_${year}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={YEAR_COLORS[yi % YEAR_COLORS.length].profit} stopOpacity={0.3} />
+                        <stop offset="95%" stopColor={YEAR_COLORS[yi % YEAR_COLORS.length].profit} stopOpacity={0} />
+                      </linearGradient>
+                    </React.Fragment>
+                  ))}
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                 <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={formatCurrency} />
                 <Tooltip content={<MonthlyGrowthTooltip />} />
                 <Legend />
-                <Area type="monotone" dataKey="sales" name="Vendas" stroke={COLORS.sales} strokeWidth={2} fill="url(#salesGradient)" />
-                <Area type="monotone" dataKey="profit" name="Lucro" stroke={COLORS.profit} strokeWidth={2} fill="url(#profitGradient)" />
+                {availableYears.map((year, yi) => (
+                  <React.Fragment key={year}>
+                    <Area type="monotone" dataKey={`sales_${year}`} name={`Vendas ${year}`} stroke={YEAR_COLORS[yi % YEAR_COLORS.length].sales} strokeWidth={2} fill={`url(#salesGradient_${year})`} />
+                    <Area type="monotone" dataKey={`profit_${year}`} name={`Lucro ${year}`} stroke={YEAR_COLORS[yi % YEAR_COLORS.length].profit} strokeWidth={2} fill={`url(#profitGradient_${year})`} />
+                  </React.Fragment>
+                ))}
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -441,7 +422,10 @@ export function SalesCharts({
                 <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                 <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="quantity" name="Quantidade" fill={COLORS.quantity} radius={[4, 4, 0, 0]} />
+                <Legend />
+                {availableYears.map((year, yi) => (
+                  <Bar key={year} dataKey={`quantity_${year}`} name={`Qtd ${year}`} fill={YEAR_COLORS[yi % YEAR_COLORS.length].quantity} radius={[4, 4, 0, 0]} />
+                ))}
               </BarChart>
             </ResponsiveContainer>
           </div>
