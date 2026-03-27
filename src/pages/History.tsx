@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { History as HistoryIcon, Trash2, FileSpreadsheet, Loader2 } from "lucide-react";
+import { History as HistoryIcon, Trash2, FileSpreadsheet, Loader2, FolderX } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
