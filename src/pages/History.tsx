@@ -147,6 +147,7 @@ const History = () => {
     }
   };
 
+  const handleDeleteAll = async () => {
     setDeletingAll(true);
     try {
       const { error: salesError } = await supabase
