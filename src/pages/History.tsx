@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { History as HistoryIcon, Trash2, FileSpreadsheet, Loader2 } from "lucide-react";
+import { History as HistoryIcon, Trash2, FileSpreadsheet, Loader2, FolderX } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -18,6 +18,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface UploadRecord {
   id: string;
@@ -40,7 +47,10 @@ const History = () => {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deletingAll, setDeletingAll] = useState(false);
+  const [deletingSubgroup, setDeletingSubgroup] = useState(false);
+  const [selectedSubgroup, setSelectedSubgroup] = useState<string>("");
 
+  const uniqueSubgroups = [...new Set(uploads.map((u) => u.subgroup))].sort();
   useEffect(() => {
     fetchUploads();
   }, []);
@@ -100,6 +110,43 @@ const History = () => {
     }
   };
 
+  const handleDeleteSubgroup = async () => {
+    if (!selectedSubgroup) return;
+    setDeletingSubgroup(true);
+    try {
+      const { error: salesError } = await supabase
+        .from("sales_data")
+        .delete()
+        .eq("subgroup", selectedSubgroup);
+
+      if (salesError) throw salesError;
+
+      const { error: historyError } = await supabase
+        .from("upload_history")
+        .delete()
+        .eq("subgroup", selectedSubgroup);
+
+      if (historyError) throw historyError;
+
+      toast({
+        title: "Subgrupo excluído",
+        description: `Todos os registros do subgrupo "${selectedSubgroup}" foram removidos`,
+      });
+
+      setSelectedSubgroup("");
+      fetchUploads();
+    } catch (error) {
+      console.error("Delete subgroup error:", error);
+      toast({
+        title: "Erro ao excluir",
+        description: "Não foi possível excluir o subgrupo",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingSubgroup(false);
+    }
+  };
+
   const handleDeleteAll = async () => {
     setDeletingAll(true);
     try {
@@ -147,40 +194,89 @@ const History = () => {
           </div>
 
           {uploads.length > 0 && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="destructive"
-                  disabled={deletingAll}
-                  className="gap-2"
-                >
-                  {deletingAll ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4" />
-                  )}
-                  Excluir Tudo
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Excluir todos os dados?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta ação irá remover TODOS os registros de vendas e histórico de uploads.
-                    Esta ação não pode ser desfeita.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleDeleteAll}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
+                <Select value={selectedSubgroup} onValueChange={setSelectedSubgroup}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Selecionar subgrupo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {uniqueSubgroups.map((sg) => (
+                      <SelectItem key={sg} value={sg}>{sg}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      disabled={!selectedSubgroup || deletingSubgroup}
+                      className="gap-2 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                    >
+                      {deletingSubgroup ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <FolderX className="h-4 w-4" />
+                      )}
+                      Excluir Subgrupo
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Excluir subgrupo "{selectedSubgroup}"?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Esta ação irá remover TODOS os registros de vendas e uploads do subgrupo "{selectedSubgroup}".
+                        Esta ação não pode ser desfeita.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleDeleteSubgroup}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Excluir Subgrupo
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    disabled={deletingAll}
+                    className="gap-2"
                   >
+                    {deletingAll ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
                     Excluir Tudo
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Excluir todos os dados?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta ação irá remover TODOS os registros de vendas e histórico de uploads.
+                      Esta ação não pode ser desfeita.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteAll}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Excluir Tudo
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           )}
         </div>
 
