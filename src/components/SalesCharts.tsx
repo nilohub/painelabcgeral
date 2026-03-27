@@ -418,22 +418,30 @@ export function SalesCharts({
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={monthlyData}>
                 <defs>
-                  <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={COLORS.sales} stopOpacity={0.3} />
-                    <stop offset="95%" stopColor={COLORS.sales} stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={COLORS.profit} stopOpacity={0.3} />
-                    <stop offset="95%" stopColor={COLORS.profit} stopOpacity={0} />
-                  </linearGradient>
+                  {availableYears.map((year, yi) => (
+                    <React.Fragment key={year}>
+                      <linearGradient id={`salesGradient_${year}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={YEAR_COLORS[yi % YEAR_COLORS.length].sales} stopOpacity={0.3} />
+                        <stop offset="95%" stopColor={YEAR_COLORS[yi % YEAR_COLORS.length].sales} stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id={`profitGradient_${year}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={YEAR_COLORS[yi % YEAR_COLORS.length].profit} stopOpacity={0.3} />
+                        <stop offset="95%" stopColor={YEAR_COLORS[yi % YEAR_COLORS.length].profit} stopOpacity={0} />
+                      </linearGradient>
+                    </React.Fragment>
+                  ))}
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                 <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={formatCurrency} />
                 <Tooltip content={<MonthlyGrowthTooltip />} />
                 <Legend />
-                <Area type="monotone" dataKey="sales" name="Vendas" stroke={COLORS.sales} strokeWidth={2} fill="url(#salesGradient)" />
-                <Area type="monotone" dataKey="profit" name="Lucro" stroke={COLORS.profit} strokeWidth={2} fill="url(#profitGradient)" />
+                {availableYears.map((year, yi) => (
+                  <React.Fragment key={year}>
+                    <Area type="monotone" dataKey={`sales_${year}`} name={`Vendas ${year}`} stroke={YEAR_COLORS[yi % YEAR_COLORS.length].sales} strokeWidth={2} fill={`url(#salesGradient_${year})`} />
+                    <Area type="monotone" dataKey={`profit_${year}`} name={`Lucro ${year}`} stroke={YEAR_COLORS[yi % YEAR_COLORS.length].profit} strokeWidth={2} fill={`url(#profitGradient_${year})`} />
+                  </React.Fragment>
+                ))}
               </AreaChart>
             </ResponsiveContainer>
           </div>
