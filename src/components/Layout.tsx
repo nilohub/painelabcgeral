@@ -16,10 +16,6 @@ const navItems = [{
   path: "/historico",
   label: "Histórico",
   icon: History
-}, {
-  path: "/ofertas",
-  label: "Ofertas",
-  icon: Tag
 }];
 export function Layout({
   children
