@@ -99,14 +99,88 @@ const History = () => {
     }
   };
 
+  const handleDeleteAll = async () => {
+    setDeletingAll(true);
+    try {
+      const { error: salesError } = await supabase
+        .from("sales_data")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000");
+
+      if (salesError) throw salesError;
+
+      const { error: historyError } = await supabase
+        .from("upload_history")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000");
+
+      if (historyError) throw historyError;
+
+      toast({
+        title: "Todos os dados excluídos",
+        description: "Todos os registros foram removidos com sucesso",
+      });
+
+      fetchUploads();
+    } catch (error) {
+      console.error("Delete all error:", error);
+      toast({
+        title: "Erro ao excluir",
+        description: "Não foi possível excluir todos os registros",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Histórico de Uploads</h1>
-          <p className="text-muted-foreground">
-            Visualize e gerencie os arquivos importados
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Histórico de Uploads</h1>
+            <p className="text-muted-foreground">
+              Visualize e gerencie os arquivos importados
+            </p>
+          </div>
+
+          {uploads.length > 0 && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="destructive"
+                  disabled={deletingAll}
+                  className="gap-2"
+                >
+                  {deletingAll ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  Excluir Tudo
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Excluir todos os dados?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação irá remover TODOS os registros de vendas e histórico de uploads.
+                    Esta ação não pode ser desfeita.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteAll}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Excluir Tudo
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
 
         <Card className="border-border bg-card shadow-card">
