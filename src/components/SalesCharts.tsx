@@ -337,53 +337,14 @@ export function SalesCharts({
     label
   }: any) => {
     if (active && payload && payload.length) {
-      const currentMonthData = payload[0]?.payload;
-      const currentMonthNum = currentMonthData?.monthNum;
-      
-      let salesGrowth = 0;
-      let profitGrowth = 0;
-      
-      if (currentMonthNum > 1) {
-        const prevMonthData = monthlyData[currentMonthNum - 2];
-        const currentSales = currentMonthData?.sales || 0;
-        const prevSales = prevMonthData?.sales || 0;
-        const currentProfit = currentMonthData?.profit || 0;
-        const prevProfit = prevMonthData?.profit || 0;
-        
-        salesGrowth = prevSales > 0 ? ((currentSales - prevSales) / prevSales) * 100 : 0;
-        profitGrowth = prevProfit > 0 ? ((currentProfit - prevProfit) / prevProfit) * 100 : 0;
-      }
-
-      const analysis = getGrowthAnalysis(currentMonthNum, salesGrowth, profitGrowth);
-
       return (
         <div className="rounded-lg border border-border bg-card p-4 shadow-lg max-w-sm">
           <p className="mb-2 font-semibold text-foreground text-base">{label}</p>
           {payload.map((entry: any, index: number) => (
             <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.name}: {formatTooltipCurrency(entry.value)}
+              {entry.name}: {entry.name.startsWith("Qtd") ? Number(entry.value).toLocaleString("pt-BR") : formatTooltipCurrency(entry.value)}
             </p>
           ))}
-          
-          {currentMonthNum > 1 && (
-            <div className="mt-3 pt-3 border-t border-border">
-              <div className="flex gap-4 mb-2">
-                <span className={`text-xs font-medium ${salesGrowth >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                  Faturamento: {salesGrowth >= 0 ? '↑' : '↓'} {Math.abs(salesGrowth).toFixed(1)}%
-                </span>
-                <span className={`text-xs font-medium ${profitGrowth >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                  Lucro: {profitGrowth >= 0 ? '↑' : '↓'} {Math.abs(profitGrowth).toFixed(1)}%
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">{analysis}</p>
-            </div>
-          )}
-          
-          {currentMonthNum === 1 && (
-            <div className="mt-3 pt-3 border-t border-border">
-              <p className="text-xs text-muted-foreground">{analysis}</p>
-            </div>
-          )}
         </div>
       );
     }
