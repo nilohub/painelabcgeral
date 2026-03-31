@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      current_stock: {
+        Row: {
+          barcode: string | null
+          created_at: string
+          id: string
+          product_code: string
+          product_description: string
+          stock_value: number
+          store: string
+        }
+        Insert: {
+          barcode?: string | null
+          created_at?: string
+          id?: string
+          product_code: string
+          product_description: string
+          stock_value?: number
+          store: string
+        }
+        Update: {
+          barcode?: string | null
+          created_at?: string
+          id?: string
+          product_code?: string
+          product_description?: string
+          stock_value?: number
+          store?: string
+        }
+        Relationships: []
+      }
       offer_products: {
         Row: {
           cpf_limit: number | null
