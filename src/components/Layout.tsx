@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Upload, History, BarChart3 } from "lucide-react";
+import { Upload, History, BarChart3, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 interface LayoutProps {
   children: React.ReactNode;
