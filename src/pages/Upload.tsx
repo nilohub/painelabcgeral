@@ -18,7 +18,7 @@ interface PendingFile {
   subgroup: string;
 }
 
-const STORES = ["01", "02", "05", "07", "08", "09"];
+const STORES = ["01", "02", "05", "07", "08", "09", "10"];
 const MONTHS = [
   { value: "1", label: "Janeiro" },
   { value: "2", label: "Fevereiro" },

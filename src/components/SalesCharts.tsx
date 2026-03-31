@@ -337,14 +337,121 @@ export function SalesCharts({
     label
   }: any) => {
     if (active && payload && payload.length) {
+      const monthIndex = MONTHS.indexOf(label);
+      const monthNum = monthIndex + 1;
+
+      // Group data by year
+      const yearData: Record<number, { sales: number; profit: number; margin: number }> = {};
+      availableYears.forEach(year => {
+        const salesEntry = payload.find((p: any) => p.dataKey === `sales_${year}`);
+        const profitEntry = payload.find((p: any) => p.dataKey === `profit_${year}`);
+        const sales = salesEntry?.value || 0;
+        const profit = profitEntry?.value || 0;
+        yearData[year] = {
+          sales,
+          profit,
+          margin: sales > 0 ? (profit / sales) * 100 : 0
+        };
+      });
+
+      // Previous month data for MoM growth
+      const prevMonthData: Record<number, { sales: number; profit: number }> = {};
+      if (monthNum > 1) {
+        availableYears.forEach(year => {
+          const prevRow = monthlyData[monthNum - 2];
+          prevMonthData[year] = {
+            sales: prevRow?.[`sales_${year}`] || 0,
+            profit: prevRow?.[`profit_${year}`] || 0
+          };
+        });
+      }
+
+      const sortedYears = [...availableYears].sort((a, b) => b - a);
+
       return (
-        <div className="rounded-lg border border-border bg-card p-4 shadow-lg max-w-sm">
-          <p className="mb-2 font-semibold text-foreground text-base">{label}</p>
-          {payload.map((entry: any, index: number) => (
-            <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.name}: {entry.name.startsWith("Qtd") ? Number(entry.value).toLocaleString("pt-BR") : formatTooltipCurrency(entry.value)}
-            </p>
-          ))}
+        <div className="rounded-lg border border-border bg-card p-4 shadow-lg max-w-md">
+          <p className="mb-3 font-bold text-foreground text-base border-b border-border pb-2">{label}</p>
+          {sortedYears.map((year, yi) => {
+            const yd = yearData[year];
+            if (!yd || (yd.sales === 0 && yd.profit === 0)) return null;
+
+            // MoM growth
+            const prev = prevMonthData[year];
+            const salesMoM = prev && prev.sales > 0 ? ((yd.sales - prev.sales) / prev.sales) * 100 : null;
+            const profitMoM = prev && prev.profit > 0 ? ((yd.profit - prev.profit) / prev.profit) * 100 : null;
+
+            // YoY growth (compare with previous year same month)
+            const prevYear = sortedYears.find(y => y < year);
+            const prevYearData = prevYear ? yearData[prevYear] : null;
+            const salesYoY = prevYearData && prevYearData.sales > 0 ? ((yd.sales - prevYearData.sales) / prevYearData.sales) * 100 : null;
+            const profitYoY = prevYearData && prevYearData.profit > 0 ? ((yd.profit - prevYearData.profit) / prevYearData.profit) * 100 : null;
+
+            const colorIdx = availableYears.indexOf(year);
+
+            return (
+              <div key={year} className={`${yi > 0 ? 'mt-3 pt-3 border-t border-border/50' : ''}`}>
+                <p className="font-semibold text-foreground mb-1.5">{year}</p>
+                
+                {/* Faturamento */}
+                <div className="flex items-center justify-between gap-4 text-sm mb-1">
+                  <span style={{ color: YEAR_COLORS[colorIdx % YEAR_COLORS.length].sales }}>
+                    Faturamento:
+                  </span>
+                  <span className="font-medium text-foreground">{formatTooltipCurrency(yd.sales)}</span>
+                </div>
+                
+                {/* Lucro */}
+                <div className="flex items-center justify-between gap-4 text-sm mb-1">
+                  <span style={{ color: YEAR_COLORS[colorIdx % YEAR_COLORS.length].profit }}>
+                    Lucro:
+                  </span>
+                  <span className="font-medium text-foreground">{formatTooltipCurrency(yd.profit)}</span>
+                </div>
+                
+                {/* Margem */}
+                <div className="flex items-center justify-between gap-4 text-sm mb-1.5">
+                  <span className="text-muted-foreground">Margem:</span>
+                  <span className={`font-semibold ${yd.margin >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                    {yd.margin.toFixed(1)}%
+                  </span>
+                </div>
+
+                {/* Crescimento MoM */}
+                {monthNum > 1 && salesMoM !== null && (
+                  <div className="flex items-center justify-between gap-4 text-xs text-muted-foreground">
+                    <span>vs mês anterior:</span>
+                    <span className="flex items-center gap-1">
+                      <span className={salesMoM >= 0 ? 'text-emerald-500' : 'text-red-500'}>
+                        {salesMoM >= 0 ? '▲' : '▼'} {Math.abs(salesMoM).toFixed(1)}% fat.
+                      </span>
+                      {profitMoM !== null && (
+                        <span className={`ml-1 ${profitMoM >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                          | {profitMoM >= 0 ? '▲' : '▼'} {Math.abs(profitMoM).toFixed(1)}% lucro
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
+
+                {/* Crescimento YoY */}
+                {salesYoY !== null && (
+                  <div className="flex items-center justify-between gap-4 text-xs text-muted-foreground mt-0.5">
+                    <span>vs {prevYear}:</span>
+                    <span className="flex items-center gap-1">
+                      <span className={salesYoY >= 0 ? 'text-emerald-500' : 'text-red-500'}>
+                        {salesYoY >= 0 ? '▲' : '▼'} {Math.abs(salesYoY).toFixed(1)}% fat.
+                      </span>
+                      {profitYoY !== null && (
+                        <span className={`ml-1 ${profitYoY >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                          | {profitYoY >= 0 ? '▲' : '▼'} {Math.abs(profitYoY).toFixed(1)}% lucro
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       );
     }
