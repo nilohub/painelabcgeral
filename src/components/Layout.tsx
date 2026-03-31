@@ -16,6 +16,10 @@ const navItems = [{
   path: "/historico",
   label: "Histórico",
   icon: History
+}, {
+  path: "/estoque",
+  label: "Estoque",
+  icon: Package
 }];
 export function Layout({
   children
