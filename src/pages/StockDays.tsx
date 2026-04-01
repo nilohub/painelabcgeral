@@ -47,20 +47,13 @@ const StockDays = () => {
   });
 
   const productsWithDays = useMemo(() => {
-    if (!stockData.length || !salesData.length) return [];
+    if (!stockData.length) return [];
 
-    // Encontrar os N últimos meses com dados
-    const monthKeys = new Set<string>();
-    salesData.forEach((s) => monthKeys.add(`${s.year}-${String(s.month).padStart(2, "0")}`));
-    const sortedMonths = Array.from(monthKeys).sort().reverse().slice(0, avgMonths);
-
-    // Calcular média de venda mensal por loja+produto
+    // Montar mapa de média de vendas mensal por loja+produto
     const salesMap = new Map<string, number>();
-    salesData.forEach((s) => {
-      const mk = `${s.year}-${String(s.month).padStart(2, "0")}`;
-      if (!sortedMonths.includes(mk)) return;
+    salesAvgData.forEach((s: any) => {
       const key = `${s.store}_${s.product_code}`;
-      salesMap.set(key, (salesMap.get(key) || 0) + Number(s.sales_value));
+      salesMap.set(key, Number(s.avg_monthly_sales));
     });
 
     // Calcular dias de estoque
@@ -75,8 +68,7 @@ const StockDays = () => {
 
     stockData.forEach((stock) => {
       const key = `${stock.store}_${stock.product_code}`;
-      const totalSales = salesMap.get(key) || 0;
-      const avgMonthlySales = totalSales / avgMonths;
+      const avgMonthlySales = salesMap.get(key) || 0;
       const dailySales = avgMonthlySales / 30;
       const daysOfStock = dailySales > 0 ? Math.round(stock.stock_value / dailySales) : 9999;
 
@@ -93,7 +85,7 @@ const StockDays = () => {
     });
 
     return results.sort((a, b) => b.days_of_stock - a.days_of_stock);
-  }, [stockData, salesData, avgMonths, minDays]);
+  }, [stockData, salesAvgData, minDays]);
 
   const stores = useMemo(() => {
     const s = new Set(productsWithDays.map((p) => p.store));
