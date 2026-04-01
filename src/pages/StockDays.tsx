@@ -142,7 +142,7 @@ const StockDays = () => {
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
-        ) : stockData.length === 0 ? (
+        ) : stockCheck.length === 0 ? (
           <Card className="border-border bg-card">
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
               <Package className="h-12 w-12 text-muted-foreground mb-4" />
