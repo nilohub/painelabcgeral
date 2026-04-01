@@ -231,7 +231,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_avg_sales_by_product: {
+        Args: { months_back?: number }
+        Returns: {
+          avg_monthly_sales: number
+          product_code: string
+          store: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
