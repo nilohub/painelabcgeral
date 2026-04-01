@@ -25,67 +25,37 @@ const StockDays = () => {
   const [selectedStore, setSelectedStore] = useState("all");
 
   // Busca estoque
-  const { data: stockData = [], isLoading: loadingStock } = useQuery({
-    queryKey: ["stock-days", "stock"],
+  // Busca estoque para checar se há dados carregados
+  const { data: stockCheck = [], isLoading: loadingStock } = useQuery({
+    queryKey: ["stock-days", "stock-check"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("current_stock").select("*");
+      const { data, error } = await supabase.from("current_stock").select("id").limit(1);
       if (error) throw error;
       return data || [];
     },
   });
 
-  // Busca média de vendas agregada via função do banco
-  const { data: salesAvgData = [], isLoading: loadingSales } = useQuery({
-    queryKey: ["stock-days", "sales-avg", avgMonths],
+  // Busca tudo calculado via função do banco
+  const { data: productsRaw = [], isLoading: loadingSales } = useQuery({
+    queryKey: ["stock-days", "calculated", avgMonths, minDays],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_avg_sales_by_product", {
+      const { data, error } = await supabase.rpc("get_stock_days", {
         months_back: avgMonths,
+        min_days: minDays,
       });
       if (error) throw error;
-      return data || [];
+      return (data || []).map((r: any) => ({
+        store: r.store as string,
+        product_code: r.product_code as string,
+        product_description: r.product_description as string,
+        stock_value: Number(r.stock_value),
+        avg_monthly_sales: Number(r.avg_monthly_sales),
+        days_of_stock: Number(r.days_of_stock),
+      }));
     },
   });
 
-  const productsWithDays = useMemo(() => {
-    if (!stockData.length) return [];
-
-    // Montar mapa de média de vendas mensal por loja+produto
-    const salesMap = new Map<string, number>();
-    salesAvgData.forEach((s: any) => {
-      const key = `${s.store}_${s.product_code}`;
-      salesMap.set(key, Number(s.avg_monthly_sales));
-    });
-
-    // Calcular dias de estoque
-    const results: Array<{
-      store: string;
-      product_code: string;
-      product_description: string;
-      stock_value: number;
-      avg_monthly_sales: number;
-      days_of_stock: number;
-    }> = [];
-
-    stockData.forEach((stock) => {
-      const key = `${stock.store}_${stock.product_code}`;
-      const avgMonthlySales = salesMap.get(key) || 0;
-      const dailySales = avgMonthlySales / 30;
-      const daysOfStock = dailySales > 0 ? Math.round(stock.stock_value / dailySales) : 9999;
-
-      if (daysOfStock >= minDays) {
-        results.push({
-          store: stock.store,
-          product_code: stock.product_code,
-          product_description: stock.product_description,
-          stock_value: stock.stock_value,
-          avg_monthly_sales: avgMonthlySales,
-          days_of_stock: daysOfStock,
-        });
-      }
-    });
-
-    return results.sort((a, b) => b.days_of_stock - a.days_of_stock);
-  }, [stockData, salesAvgData, minDays]);
+  const productsWithDays = productsRaw;
 
   const stores = useMemo(() => {
     const s = new Set(productsWithDays.map((p) => p.store));
@@ -172,7 +142,7 @@ const StockDays = () => {
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
-        ) : stockData.length === 0 ? (
+        ) : stockCheck.length === 0 ? (
           <Card className="border-border bg-card">
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
               <Package className="h-12 w-12 text-muted-foreground mb-4" />

@@ -231,11 +231,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_avg_sales_by_product: {
-        Args: { months_back?: number }
+      get_stock_days: {
+        Args: { min_days?: number; months_back?: number }
         Returns: {
           avg_monthly_sales: number
+          days_of_stock: number
           product_code: string
+          product_description: string
+          stock_value: number
           store: string
         }[]
       }
