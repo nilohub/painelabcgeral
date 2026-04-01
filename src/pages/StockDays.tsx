@@ -34,13 +34,13 @@ const StockDays = () => {
     },
   });
 
-  // Busca vendas para calcular média
-  const { data: salesData = [], isLoading: loadingSales } = useQuery({
-    queryKey: ["stock-days", "sales"],
+  // Busca média de vendas agregada via função do banco
+  const { data: salesAvgData = [], isLoading: loadingSales } = useQuery({
+    queryKey: ["stock-days", "sales-avg", avgMonths],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("sales_data")
-        .select("store, product_code, year, month, sales_value");
+      const { data, error } = await supabase.rpc("get_avg_sales_by_product", {
+        months_back: avgMonths,
+      });
       if (error) throw error;
       return data || [];
     },
