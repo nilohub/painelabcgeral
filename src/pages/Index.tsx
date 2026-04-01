@@ -177,13 +177,11 @@ const Index = () => {
   }
   return <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground">Análise completa dos dados de vendas por período</p>
-        </div>
-
-        <div className="flex flex-col md:flex-row gap-4 md:items-start md:justify-between">
-          <DashboardFilters filters={filters} availableFilters={availableFilters} onFilterChange={handleFilterChange} />
+        <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground tracking-tight">Dashboard</h1>
+            <p className="text-muted-foreground text-sm">Análise completa dos dados de vendas por período</p>
+          </div>
           <ProductSearch 
             value={searchTerm} 
             onChange={setSearchTerm} 
@@ -192,13 +190,13 @@ const Index = () => {
           />
         </div>
 
+        <DashboardFilters filters={filters} availableFilters={availableFilters} onFilterChange={handleFilterChange} />
+
         <StatsCards data={filteredData} />
 
         <SalesCharts data={filteredData} />
 
         <TopProductsTable data={filteredData} />
-
-        
       </div>
     </Layout>;
 };
