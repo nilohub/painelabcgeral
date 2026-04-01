@@ -1,87 +1,126 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, DollarSign, Package, Percent } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Package, Percent, ShoppingCart, Target, BarChart3 } from "lucide-react";
 import type { SalesData } from "@/pages/Index";
+import { useMemo } from "react";
 
 interface StatsCardsProps {
   data: SalesData[];
 }
 
 export function StatsCards({ data }: StatsCardsProps) {
-  const totalSales = data.reduce((sum, item) => sum + Number(item.sales_value), 0);
-  const totalProfit = data.reduce((sum, item) => sum + Number(item.profit), 0);
-  const totalQuantity = data.reduce((sum, item) => sum + Number(item.quantity), 0);
-  const profitMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
-  const uniqueProducts = new Set(data.map((item) => item.product_code)).size;
+  const stats = useMemo(() => {
+    const totalSales = data.reduce((sum, item) => sum + Number(item.sales_value), 0);
+    const totalProfit = data.reduce((sum, item) => sum + Number(item.profit), 0);
+    const totalQuantity = data.reduce((sum, item) => sum + Number(item.quantity), 0);
+    const profitMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
+    const uniqueProducts = new Set(data.map((item) => item.product_code)).size;
+    const uniqueStores = new Set(data.map((item) => item.store)).size;
+    const ticketMedio = totalQuantity > 0 ? totalSales / totalQuantity : 0;
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(value);
-  };
+    // Produto mais vendido (por valor)
+    const productSales: Record<string, { desc: string; sales: number }> = {};
+    data.forEach((item) => {
+      if (!productSales[item.product_code]) {
+        productSales[item.product_code] = { desc: item.product_description, sales: 0 };
+      }
+      productSales[item.product_code].sales += Number(item.sales_value);
+    });
+    const topProduct = Object.values(productSales).sort((a, b) => b.sales - a.sales)[0];
 
-  const formatNumber = (value: number) => {
-    return new Intl.NumberFormat("pt-BR").format(value);
-  };
+    return { totalSales, totalProfit, totalQuantity, profitMargin, uniqueProducts, uniqueStores, ticketMedio, topProduct };
+  }, [data]);
 
-  const stats = [
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+
+  const formatNumber = (value: number) =>
+    new Intl.NumberFormat("pt-BR").format(value);
+
+  const cards = [
     {
-      title: "Vendas Totais",
-      value: formatCurrency(totalSales),
+      title: "Faturamento Total",
+      value: formatCurrency(stats.totalSales),
+      subtitle: `${stats.uniqueStores} lojas`,
       icon: DollarSign,
       color: "text-chart-sales",
       bgColor: "bg-chart-sales/10",
+      borderColor: "border-l-[hsl(var(--chart-sales))]",
     },
     {
       title: "Lucro Total",
-      value: formatCurrency(totalProfit),
+      value: formatCurrency(stats.totalProfit),
+      subtitle: `Margem: ${stats.profitMargin.toFixed(1)}%`,
       icon: TrendingUp,
       color: "text-chart-profit",
       bgColor: "bg-chart-profit/10",
+      borderColor: "border-l-[hsl(var(--chart-profit))]",
     },
     {
       title: "Unidades Vendidas",
-      value: formatNumber(totalQuantity),
+      value: formatNumber(stats.totalQuantity),
+      subtitle: `${stats.uniqueProducts} produtos únicos`,
       icon: Package,
       color: "text-chart-quantity",
       bgColor: "bg-chart-quantity/10",
+      borderColor: "border-l-[hsl(var(--chart-quantity))]",
     },
     {
-      title: "Margem de Lucro",
-      value: `${profitMargin.toFixed(1)}%`,
-      icon: Percent,
+      title: "Ticket Médio",
+      value: formatCurrency(stats.ticketMedio),
+      subtitle: "valor médio por unidade",
+      icon: ShoppingCart,
       color: "text-chart-accent",
       bgColor: "bg-chart-accent/10",
+      borderColor: "border-l-[hsl(var(--chart-accent))]",
     },
   ];
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {stats.map((stat, index) => {
-        const Icon = stat.icon;
-        return (
-          <Card
-            key={stat.title}
-            className="border-border bg-card shadow-card transition-all duration-300 hover:shadow-card-hover animate-slide-up"
-            style={{ animationDelay: `${index * 100}ms` }}
-          >
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
-                  <p className="mt-2 text-2xl font-bold text-foreground">{stat.value}</p>
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {cards.map((stat, index) => {
+          const Icon = stat.icon;
+          return (
+            <Card
+              key={stat.title}
+              className="border-border bg-card shadow-card transition-all duration-300 hover:shadow-card-hover hover:-translate-y-0.5 animate-slide-up overflow-hidden border-l-4"
+              style={{
+                animationDelay: `${index * 80}ms`,
+                borderLeftColor: `var(--${stat.title === 'Faturamento Total' ? 'chart-sales' : stat.title === 'Lucro Total' ? 'chart-profit' : stat.title === 'Unidades Vendidas' ? 'chart-quantity' : 'chart-accent'})`,
+              }}
+            >
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{stat.title}</p>
+                    <p className="mt-2 text-2xl font-extrabold text-foreground tracking-tight">{stat.value}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{stat.subtitle}</p>
+                  </div>
+                  <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${stat.bgColor}`}>
+                    <Icon className={`h-5 w-5 ${stat.color}`} />
+                  </div>
                 </div>
-                <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${stat.bgColor}`}>
-                  <Icon className={`h-6 w-6 ${stat.color}`} />
-                </div>
-              </div>
-              <p className="mt-3 text-xs text-muted-foreground">
-                {uniqueProducts} produtos únicos
-              </p>
-            </CardContent>
-          </Card>
-        );
-      })}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Top product highlight */}
+      {stats.topProduct && (
+        <Card className="border-border bg-gradient-to-r from-primary/5 to-accent/5 shadow-card animate-slide-up" style={{ animationDelay: '320ms' }}>
+          <CardContent className="py-3 px-5 flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+              <Target className="h-4 w-4 text-primary" />
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Produto destaque:</span>
+              <span className="font-semibold text-foreground truncate max-w-[300px]">{stats.topProduct.desc}</span>
+              <span className="text-primary font-bold">{formatCurrency(stats.topProduct.sales)}</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
