@@ -3,36 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Medal } from "lucide-react";
-import type { SalesData } from "@/pages/Index";
+import type { ProductRow } from "@/pages/Index";
 
 interface TopProductsTableProps {
-  data: SalesData[];
+  products: ProductRow[];
 }
 
-export function TopProductsTable({ data }: TopProductsTableProps) {
-  const topProducts = useMemo(() => {
-    const grouped: Record<string, {
-      code: string;
-      description: string;
-      sales: number;
-      profit: number;
-      quantity: number;
-    }> = {};
-
-    data.forEach((item) => {
-      const key = item.product_code;
-      if (!grouped[key]) {
-        grouped[key] = { code: item.product_code, description: item.product_description, sales: 0, profit: 0, quantity: 0 };
-      }
-      grouped[key].sales += Number(item.sales_value);
-      grouped[key].profit += Number(item.profit);
-      grouped[key].quantity += Number(item.quantity);
-    });
-
-    return Object.values(grouped).sort((a, b) => b.sales - a.sales).slice(0, 15);
-  }, [data]);
-
-  const totalSales = useMemo(() => data.reduce((sum, item) => sum + Number(item.sales_value), 0), [data]);
+export function TopProductsTable({ products }: TopProductsTableProps) {
+  const top15 = useMemo(() => products.slice(0, 15), [products]);
+  const totalSales = useMemo(() => products.reduce((sum, p) => sum + Number(p.total_sales), 0), [products]);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -71,13 +50,16 @@ export function TopProductsTable({ data }: TopProductsTableProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {topProducts.map((product, index) => {
-                const margin = product.sales > 0 ? (product.profit / product.sales) * 100 : 0;
-                const shareOfTotal = totalSales > 0 ? (product.sales / totalSales) * 100 : 0;
+              {top15.map((product, index) => {
+                const sales = Number(product.total_sales);
+                const profit = Number(product.total_profit);
+                const quantity = Number(product.total_quantity);
+                const margin = sales > 0 ? (profit / sales) * 100 : 0;
+                const shareOfTotal = totalSales > 0 ? (sales / totalSales) * 100 : 0;
                 const isPositiveMargin = margin > 15;
 
                 return (
-                  <TableRow key={product.code} className="border-border group hover:bg-muted/50 transition-colors">
+                  <TableRow key={product.product_code} className="border-border group hover:bg-muted/50 transition-colors">
                     <TableCell>
                       {index < 3 ? (
                         <Medal className={`h-4 w-4 ${getMedalColor(index)}`} />
@@ -87,20 +69,20 @@ export function TopProductsTable({ data }: TopProductsTableProps) {
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="font-mono text-xs">
-                        {product.code}
+                        {product.product_code}
                       </Badge>
                     </TableCell>
                     <TableCell className="max-w-[250px] truncate font-medium text-sm">
-                      {product.description}
+                      {product.product_description}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-sm">
-                      {formatNumber(product.quantity)}
+                      {formatNumber(quantity)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums font-semibold text-sm text-chart-sales">
-                      {formatCurrency(product.sales)}
+                      {formatCurrency(sales)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums font-medium text-sm text-chart-profit">
-                      {formatCurrency(product.profit)}
+                      {formatCurrency(profit)}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
