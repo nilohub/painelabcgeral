@@ -34,7 +34,7 @@ const Index = () => {
   const [filters, setFilters] = useState<Filters>({
     year: "all",
     month: "all",
-    store: "all",
+    stores: [],
     subgroup: "all"
   });
   const [searchTerm, setSearchTerm] = useState("");
