@@ -139,7 +139,7 @@ const Index = () => {
     setData(allData);
     setLoading(false);
   };
-  const handleFilterChange = (key: keyof Filters, value: string) => {
+  const handleFilterChange = (key: keyof Filters, value: string | string[]) => {
     setFilters(prev => ({
       ...prev,
       [key]: value
