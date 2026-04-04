@@ -25,7 +25,7 @@ export interface SalesData {
 export interface Filters {
   year: string;
   month: string;
-  store: string;
+  stores: string[];
   subgroup: string;
 }
 const Index = () => {
