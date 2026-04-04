@@ -1,18 +1,34 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { DollarSign, Package, TrendingUp, ShoppingCart, Target } from "lucide-react";
-import type { DashboardStats } from "@/pages/Index";
+import { TrendingUp, TrendingDown, DollarSign, Package, Percent, ShoppingCart, Target, BarChart3 } from "lucide-react";
+import type { SalesData } from "@/pages/Index";
+import { useMemo } from "react";
 
 interface StatsCardsProps {
-  stats: DashboardStats;
+  data: SalesData[];
 }
 
-export function StatsCards({ stats }: StatsCardsProps) {
-  const profitMargin = Number(stats.total_sales) > 0
-    ? (Number(stats.total_profit) / Number(stats.total_sales)) * 100
-    : 0;
-  const ticketMedio = Number(stats.total_quantity) > 0
-    ? Number(stats.total_sales) / Number(stats.total_quantity)
-    : 0;
+export function StatsCards({ data }: StatsCardsProps) {
+  const stats = useMemo(() => {
+    const totalSales = data.reduce((sum, item) => sum + Number(item.sales_value), 0);
+    const totalProfit = data.reduce((sum, item) => sum + Number(item.profit), 0);
+    const totalQuantity = data.reduce((sum, item) => sum + Number(item.quantity), 0);
+    const profitMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
+    const uniqueProducts = new Set(data.map((item) => item.product_code)).size;
+    const uniqueStores = new Set(data.map((item) => item.store)).size;
+    const ticketMedio = totalQuantity > 0 ? totalSales / totalQuantity : 0;
+
+    // Produto mais vendido (por valor)
+    const productSales: Record<string, { desc: string; sales: number }> = {};
+    data.forEach((item) => {
+      if (!productSales[item.product_code]) {
+        productSales[item.product_code] = { desc: item.product_description, sales: 0 };
+      }
+      productSales[item.product_code].sales += Number(item.sales_value);
+    });
+    const topProduct = Object.values(productSales).sort((a, b) => b.sales - a.sales)[0];
+
+    return { totalSales, totalProfit, totalQuantity, profitMargin, uniqueProducts, uniqueStores, ticketMedio, topProduct };
+  }, [data]);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -23,39 +39,39 @@ export function StatsCards({ stats }: StatsCardsProps) {
   const cards = [
     {
       title: "Faturamento Total",
-      value: formatCurrency(Number(stats.total_sales)),
-      subtitle: `${stats.unique_stores} lojas`,
+      value: formatCurrency(stats.totalSales),
+      subtitle: `${stats.uniqueStores} lojas`,
       icon: DollarSign,
       color: "text-chart-sales",
       bgColor: "bg-chart-sales/10",
-      cssVar: "--chart-sales",
+      borderColor: "border-l-[hsl(var(--chart-sales))]",
     },
     {
       title: "Lucro Total",
-      value: formatCurrency(Number(stats.total_profit)),
-      subtitle: `Margem: ${profitMargin.toFixed(1)}%`,
+      value: formatCurrency(stats.totalProfit),
+      subtitle: `Margem: ${stats.profitMargin.toFixed(1)}%`,
       icon: TrendingUp,
       color: "text-chart-profit",
       bgColor: "bg-chart-profit/10",
-      cssVar: "--chart-profit",
+      borderColor: "border-l-[hsl(var(--chart-profit))]",
     },
     {
       title: "Unidades Vendidas",
-      value: formatNumber(Number(stats.total_quantity)),
-      subtitle: `${stats.unique_products} produtos únicos`,
+      value: formatNumber(stats.totalQuantity),
+      subtitle: `${stats.uniqueProducts} produtos únicos`,
       icon: Package,
       color: "text-chart-quantity",
       bgColor: "bg-chart-quantity/10",
-      cssVar: "--chart-quantity",
+      borderColor: "border-l-[hsl(var(--chart-quantity))]",
     },
     {
       title: "Ticket Médio",
-      value: formatCurrency(ticketMedio),
+      value: formatCurrency(stats.ticketMedio),
       subtitle: "valor médio por unidade",
       icon: ShoppingCart,
       color: "text-chart-accent",
       bgColor: "bg-chart-accent/10",
-      cssVar: "--chart-accent",
+      borderColor: "border-l-[hsl(var(--chart-accent))]",
     },
   ];
 
@@ -70,7 +86,7 @@ export function StatsCards({ stats }: StatsCardsProps) {
               className="border-border bg-card shadow-card transition-all duration-300 hover:shadow-card-hover hover:-translate-y-0.5 animate-slide-up overflow-hidden border-l-4"
               style={{
                 animationDelay: `${index * 80}ms`,
-                borderLeftColor: `var(${stat.cssVar})`,
+                borderLeftColor: `var(--${stat.title === 'Faturamento Total' ? 'chart-sales' : stat.title === 'Lucro Total' ? 'chart-profit' : stat.title === 'Unidades Vendidas' ? 'chart-quantity' : 'chart-accent'})`,
               }}
             >
               <CardContent className="p-5">
@@ -90,7 +106,8 @@ export function StatsCards({ stats }: StatsCardsProps) {
         })}
       </div>
 
-      {stats.top_product && (
+      {/* Top product highlight */}
+      {stats.topProduct && (
         <Card className="border-border bg-gradient-to-r from-primary/5 to-accent/5 shadow-card animate-slide-up" style={{ animationDelay: '320ms' }}>
           <CardContent className="py-3 px-5 flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
@@ -98,8 +115,8 @@ export function StatsCards({ stats }: StatsCardsProps) {
             </div>
             <div className="flex items-center gap-2 text-sm">
               <span className="text-muted-foreground">Produto destaque:</span>
-              <span className="font-semibold text-foreground truncate max-w-[300px]">{stats.top_product.desc}</span>
-              <span className="text-primary font-bold">{formatCurrency(Number(stats.top_product.sales))}</span>
+              <span className="font-semibold text-foreground truncate max-w-[300px]">{stats.topProduct.desc}</span>
+              <span className="text-primary font-bold">{formatCurrency(stats.topProduct.sales)}</span>
             </div>
           </CardContent>
         </Card>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Layout } from "@/components/Layout";
 import { DashboardFilters } from "@/components/DashboardFilters";
 import { StatsCards } from "@/components/StatsCards";
@@ -7,64 +7,30 @@ import { TopProductsTable } from "@/components/TopProductsTable";
 import { ProductSearch } from "@/components/ProductSearch";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, FileWarning } from "lucide-react";
-
+export interface SalesData {
+  id: string;
+  year: number;
+  month: number;
+  store: string;
+  subgroup: string;
+  product_code: string;
+  product_description: string;
+  quantity: number;
+  sales_value: number;
+  profit: number;
+  quantity_percentage: number;
+  sales_percentage: number;
+  profit_percentage: number;
+}
 export interface Filters {
   year: string;
   month: string;
   stores: string[];
   subgroup: string;
 }
-
-export interface DashboardStats {
-  total_sales: number;
-  total_profit: number;
-  total_quantity: number;
-  unique_products: number;
-  unique_stores: number;
-  top_product: { desc: string; sales: number } | null;
-}
-
-export interface MonthlyChartRow {
-  data_year: number;
-  data_month: number;
-  total_sales: number;
-  total_profit: number;
-  total_quantity: number;
-}
-
-export interface StoreChartRow {
-  store: string;
-  total_sales: number;
-  total_profit: number;
-  total_quantity: number;
-}
-
-export interface SubgroupChartRow {
-  subgroup: string;
-  total_sales: number;
-  total_profit: number;
-  total_quantity: number;
-}
-
-export interface ProductRow {
-  product_code: string;
-  product_description: string;
-  total_sales: number;
-  total_profit: number;
-  total_quantity: number;
-}
-
-export interface ProductTrendRow {
-  product_code: string;
-  product_description: string;
-  data_year: number;
-  data_month: number;
-  total_sales: number;
-}
-
 const Index = () => {
+  const [data, setData] = useState<SalesData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [hasData, setHasData] = useState(false);
   const [filters, setFilters] = useState<Filters>({
     year: "all",
     month: "all",
@@ -72,115 +38,125 @@ const Index = () => {
     subgroup: "all"
   });
   const [searchTerm, setSearchTerm] = useState("");
+  const filteredData = useMemo(() => {
+    if (!searchTerm.trim()) return data;
+    const term = searchTerm.toLowerCase();
+    return data.filter(item => item.product_code.toLowerCase().includes(term) || item.product_description.toLowerCase().includes(term));
+  }, [data, searchTerm]);
 
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [monthlyData, setMonthlyData] = useState<MonthlyChartRow[]>([]);
-  const [storeData, setStoreData] = useState<StoreChartRow[]>([]);
-  const [subgroupData, setSubgroupData] = useState<SubgroupChartRow[]>([]);
-  const [topProducts, setTopProducts] = useState<ProductRow[]>([]);
-  const [productTrends, setProductTrends] = useState<ProductTrendRow[]>([]);
-
+  const matchedProductName = useMemo(() => {
+    if (!searchTerm.trim() || filteredData.length === 0) return undefined;
+    const firstMatch = filteredData[0];
+    return `${firstMatch.product_code} - ${firstMatch.product_description}`;
+  }, [filteredData, searchTerm]);
   const [availableFilters, setAvailableFilters] = useState({
     years: [] as string[],
     months: [] as string[],
     stores: [] as string[],
     subgroups: [] as string[]
   });
-
-  const filterParams = useMemo(() => ({
-    p_year: filters.year !== "all" ? parseInt(filters.year) : null,
-    p_month: filters.month !== "all" ? parseInt(filters.month) : null,
-    p_stores: filters.stores.length > 0 ? filters.stores : null,
-    p_subgroup: filters.subgroup !== "all" ? filters.subgroup : null,
-  }), [filters]);
-
-  // Search filtering on loaded products
-  const filteredProducts = useMemo(() => {
-    if (!searchTerm.trim()) return topProducts;
-    const term = searchTerm.toLowerCase();
-    return topProducts.filter(p =>
-      p.product_code.toLowerCase().includes(term) ||
-      p.product_description.toLowerCase().includes(term)
-    );
-  }, [topProducts, searchTerm]);
-
-  const matchedProductName = useMemo(() => {
-    if (!searchTerm.trim() || filteredProducts.length === 0) return undefined;
-    const first = filteredProducts[0];
-    return `${first.product_code} - ${first.product_description}`;
-  }, [filteredProducts, searchTerm]);
-
   useEffect(() => {
+    fetchData();
     fetchFilterOptions();
   }, []);
-
   useEffect(() => {
-    fetchDashboardData();
-  }, [filterParams]);
-
+    fetchData();
+  }, [filters]);
   const fetchFilterOptions = async () => {
-    const { data } = await supabase.rpc("get_filter_options");
-    if (data) {
-      const d = data as any;
+    // Fetch all filter options with pagination to avoid 1000 row limit
+    let allFilterData: { year: number; month: number; store: string; subgroup: string }[] = [];
+    let from = 0;
+    const batchSize = 1000;
+    let hasMore = true;
+    
+    while (hasMore) {
+      const { data: salesData } = await supabase
+        .from("sales_data")
+        .select("year, month, store, subgroup")
+        .range(from, from + batchSize - 1);
+      
+      if (salesData && salesData.length > 0) {
+        allFilterData = [...allFilterData, ...salesData];
+        from += batchSize;
+        hasMore = salesData.length === batchSize;
+      } else {
+        hasMore = false;
+      }
+    }
+    
+    if (allFilterData.length > 0) {
+      const years = [...new Set(allFilterData.map(d => d.year.toString()))].sort();
+      const months = [...new Set(allFilterData.map(d => d.month.toString()))].sort((a, b) => Number(a) - Number(b));
+      const stores = [...new Set(allFilterData.map(d => d.store))].sort();
+      const subgroups = [...new Set(allFilterData.map(d => d.subgroup))].sort();
       setAvailableFilters({
-        years: (d.years || []).map(String),
-        months: (d.months || []).map(String),
-        stores: (d.stores || []).map(String),
-        subgroups: (d.subgroups || []).map(String),
+        years,
+        months,
+        stores,
+        subgroups
       });
     }
   };
-
-  const fetchDashboardData = async () => {
+  const fetchData = async () => {
     setLoading(true);
-
-    // All RPC calls in parallel
-    const [statsRes, monthlyRes, storeRes, subgroupRes, productsRes, trendsRes] = await Promise.all([
-      supabase.rpc("get_dashboard_stats", filterParams),
-      supabase.rpc("get_monthly_chart_data", filterParams),
-      supabase.rpc("get_store_chart_data", filterParams),
-      supabase.rpc("get_subgroup_chart_data", filterParams),
-      supabase.rpc("get_top_products_data", { ...filterParams, p_limit: 50 }),
-      supabase.rpc("get_product_trends_data", { ...filterParams, p_limit: 100 }),
-    ]);
-
-    const statsData = statsRes.data as any;
-    if (statsData) {
-      setStats(statsData);
-      setHasData(Number(statsData.total_sales) > 0 || Number(statsData.total_quantity) > 0);
-    } else {
-      setHasData(false);
+    
+    // Fetch all data with pagination to avoid default 1000 row limit
+    let allData: SalesData[] = [];
+    let from = 0;
+    const batchSize = 1000;
+    let hasMore = true;
+    
+    while (hasMore) {
+      let query = supabase.from("sales_data").select("*").range(from, from + batchSize - 1);
+      
+      if (filters.year !== "all") {
+        query = query.eq("year", parseInt(filters.year));
+      }
+      if (filters.month !== "all") {
+        query = query.eq("month", parseInt(filters.month));
+      }
+      if (filters.stores.length > 0) {
+        query = query.in("store", filters.stores);
+      }
+      if (filters.subgroup !== "all") {
+        query = query.eq("subgroup", filters.subgroup);
+      }
+      
+      const { data: salesData, error } = await query;
+      
+      if (error) {
+        console.error("Error fetching data:", error);
+        hasMore = false;
+      } else if (salesData && salesData.length > 0) {
+        allData = [...allData, ...salesData];
+        from += batchSize;
+        hasMore = salesData.length === batchSize;
+      } else {
+        hasMore = false;
+      }
     }
-
-    setMonthlyData((monthlyRes.data as MonthlyChartRow[]) || []);
-    setStoreData((storeRes.data as StoreChartRow[]) || []);
-    setSubgroupData((subgroupRes.data as SubgroupChartRow[]) || []);
-    setTopProducts((productsRes.data as ProductRow[]) || []);
-    setProductTrends((trendsRes.data as ProductTrendRow[]) || []);
-
+    
+    setData(allData);
     setLoading(false);
   };
-
   const handleFilterChange = (key: keyof Filters, value: string | string[]) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+    setFilters(prev => ({
+      ...prev,
+      [key]: value
+    }));
   };
-
   if (loading) {
-    return (
-      <Layout>
+    return <Layout>
         <div className="flex h-[60vh] items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
             <p className="text-muted-foreground">Carregando dados...</p>
           </div>
         </div>
-      </Layout>
-    );
+      </Layout>;
   }
-
-  if (!hasData) {
-    return (
-      <Layout>
+  if (data.length === 0) {
+    return <Layout>
         <div className="flex h-[60vh] items-center justify-center">
           <div className="flex flex-col items-center gap-4 text-center">
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted">
@@ -197,42 +173,31 @@ const Index = () => {
             </a>
           </div>
         </div>
-      </Layout>
-    );
+      </Layout>;
   }
-
-  return (
-    <Layout>
+  return <Layout>
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground tracking-tight">Dashboard</h1>
             <p className="text-muted-foreground text-sm">Análise completa dos dados de vendas por período</p>
           </div>
-          <ProductSearch
-            value={searchTerm}
-            onChange={setSearchTerm}
-            resultCount={searchTerm ? filteredProducts.length : undefined}
+          <ProductSearch 
+            value={searchTerm} 
+            onChange={setSearchTerm} 
+            resultCount={searchTerm ? filteredData.length : undefined}
             matchedProduct={matchedProductName}
           />
         </div>
 
         <DashboardFilters filters={filters} availableFilters={availableFilters} onFilterChange={handleFilterChange} />
 
-        {stats && <StatsCards stats={stats} />}
+        <StatsCards data={filteredData} />
 
-        <SalesCharts
-          monthlyData={monthlyData}
-          storeData={storeData}
-          subgroupData={subgroupData}
-          topProducts={searchTerm ? filteredProducts : topProducts}
-          productTrends={productTrends}
-        />
+        <SalesCharts data={filteredData} />
 
-        <TopProductsTable products={searchTerm ? filteredProducts : topProducts} />
+        <TopProductsTable data={filteredData} />
       </div>
-    </Layout>
-  );
+    </Layout>;
 };
-
 export default Index;
