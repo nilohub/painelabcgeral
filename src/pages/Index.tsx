@@ -115,8 +115,8 @@ const Index = () => {
       if (filters.month !== "all") {
         query = query.eq("month", parseInt(filters.month));
       }
-      if (filters.store !== "all") {
-        query = query.eq("store", filters.store);
+      if (filters.stores.length > 0) {
+        query = query.in("store", filters.stores);
       }
       if (filters.subgroup !== "all") {
         query = query.eq("subgroup", filters.subgroup);
