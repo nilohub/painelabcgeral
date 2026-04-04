@@ -6,15 +6,18 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import type { SalesData } from "@/pages/Index";
+import type { MonthlyChartRow, StoreChartRow, SubgroupChartRow, ProductRow, ProductTrendRow } from "@/pages/Index";
 
 interface SalesChartsProps {
-  data: SalesData[];
+  monthlyData: MonthlyChartRow[];
+  storeData: StoreChartRow[];
+  subgroupData: SubgroupChartRow[];
+  topProducts: ProductRow[];
+  productTrends: ProductTrendRow[];
 }
 
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-// Using CSS variables for consistent theming
 const COLORS = {
   sales: "hsl(var(--chart-sales))",
   profit: "hsl(var(--chart-profit))",
@@ -36,34 +39,30 @@ const PIE_COLORS = [
   "hsl(var(--destructive))",
   "hsl(var(--primary))"
 ];
-export function SalesCharts({
-  data
-}: SalesChartsProps) {
+
+export function SalesCharts({ monthlyData: rawMonthly, storeData: rawStore, subgroupData: rawSubgroup, topProducts, productTrends }: SalesChartsProps) {
   const availableYears = useMemo(() => {
-    const years = [...new Set(data.map(d => d.year))].sort();
+    const years = [...new Set(rawMonthly.map(d => d.data_year))].sort();
     return years;
-  }, [data]);
+  }, [rawMonthly]);
 
   const monthlyData = useMemo(() => {
-    const grouped: Record<string, Record<number, { sales: number; profit: number; quantity: number }>> = {};
-    
+    const grouped: Record<number, Record<number, { sales: number; profit: number; quantity: number }>> = {};
     availableYears.forEach(year => {
       grouped[year] = {};
       for (let i = 1; i <= 12; i++) {
         grouped[year][i] = { sales: 0, profit: 0, quantity: 0 };
       }
     });
-    
-    data.forEach(item => {
-      const monthKey = Number(item.month);
-      const year = item.year;
-      if (monthKey >= 1 && monthKey <= 12 && grouped[year]) {
-        grouped[year][monthKey].sales += Number(item.sales_value) || 0;
-        grouped[year][monthKey].profit += Number(item.profit) || 0;
-        grouped[year][monthKey].quantity += Number(item.quantity) || 0;
+    rawMonthly.forEach(item => {
+      if (grouped[item.data_year]?.[item.data_month]) {
+        grouped[item.data_year][item.data_month] = {
+          sales: Number(item.total_sales),
+          profit: Number(item.total_profit),
+          quantity: Number(item.total_quantity),
+        };
       }
     });
-    
     return Array.from({ length: 12 }, (_, i) => {
       const row: any = { month: MONTHS[i], monthNum: i + 1 };
       availableYears.forEach(year => {
@@ -73,130 +72,83 @@ export function SalesCharts({
       });
       return row;
     });
-  }, [data, availableYears]);
-  const storeData = useMemo(() => {
-    const grouped: Record<string, {
-      sales: number;
-      profit: number;
-      quantity: number;
-    }> = {};
-    data.forEach(item => {
-      if (!grouped[item.store]) {
-        grouped[item.store] = {
-          sales: 0,
-          profit: 0,
-          quantity: 0
-        };
-      }
-      grouped[item.store].sales += Number(item.sales_value);
-      grouped[item.store].profit += Number(item.profit);
-      grouped[item.store].quantity += Number(item.quantity);
-    });
-    return Object.entries(grouped).map(([store, values]) => ({
-      name: `Loja ${store}`,
-      ...values
-    })).sort((a, b) => b.sales - a.sales);
-  }, [data]);
-  const subgroupData = useMemo(() => {
-    const grouped: Record<string, number> = {};
-    data.forEach(item => {
-      if (!grouped[item.subgroup]) {
-        grouped[item.subgroup] = 0;
-      }
-      grouped[item.subgroup] += Number(item.sales_value);
-    });
-    return Object.entries(grouped).map(([name, value]) => ({
-      name,
-      value
-    })).sort((a, b) => b.value - a.value).slice(0, 6);
-  }, [data]);
+  }, [rawMonthly, availableYears]);
 
-  // Análise Pareto (80/20) - produtos que representam 80% das vendas
+  const storeData = useMemo(() => {
+    return rawStore.map(s => ({
+      name: `Loja ${s.store}`,
+      sales: Number(s.total_sales),
+      profit: Number(s.total_profit),
+      quantity: Number(s.total_quantity),
+    }));
+  }, [rawStore]);
+
+  const subgroupData = useMemo(() => {
+    return rawSubgroup.slice(0, 6).map(s => ({
+      name: s.subgroup,
+      value: Number(s.total_sales),
+    }));
+  }, [rawSubgroup]);
+
   const paretoData = useMemo(() => {
-    const productSales: Record<string, { name: string; sales: number }> = {};
-    data.forEach(item => {
-      const key = item.product_code;
-      if (!productSales[key]) {
-        productSales[key] = { name: item.product_description.substring(0, 30), sales: 0 };
-      }
-      productSales[key].sales += Number(item.sales_value);
-    });
-    
-    const sorted = Object.values(productSales).sort((a, b) => b.sales - a.sales);
-    const totalSales = sorted.reduce((sum, p) => sum + p.sales, 0);
-    
+    const totalSales = topProducts.reduce((sum, p) => sum + Number(p.total_sales), 0);
     let cumulative = 0;
-    return sorted.slice(0, 15).map(product => {
-      cumulative += product.sales;
+    return topProducts.slice(0, 15).map(p => {
+      const sales = Number(p.total_sales);
+      cumulative += sales;
       return {
-        name: product.name,
-        sales: product.sales,
-        percentual: (product.sales / totalSales) * 100,
-        cumulativo: (cumulative / totalSales) * 100
+        name: p.product_description.substring(0, 30),
+        sales,
+        percentual: totalSales > 0 ? (sales / totalSales) * 100 : 0,
+        cumulativo: totalSales > 0 ? (cumulative / totalSales) * 100 : 0,
       };
     });
-  }, [data]);
+  }, [topProducts]);
 
-  // Margem de Lucro por Subgrupo
   const marginBySubgroupData = useMemo(() => {
-    const grouped: Record<string, { sales: number; profit: number }> = {};
-    data.forEach(item => {
-      if (!grouped[item.subgroup]) {
-        grouped[item.subgroup] = { sales: 0, profit: 0 };
-      }
-      grouped[item.subgroup].sales += Number(item.sales_value);
-      grouped[item.subgroup].profit += Number(item.profit);
-    });
-    return Object.entries(grouped).map(([name, values]) => ({
-      name: name.length > 20 ? name.substring(0, 20) + '...' : name,
-      fullName: name,
-      margin: values.sales > 0 ? (values.profit / values.sales) * 100 : 0,
-      sales: values.sales,
-      profit: values.profit
-    })).sort((a, b) => b.margin - a.margin);
-  }, [data]);
+    return rawSubgroup.map(s => {
+      const sales = Number(s.total_sales);
+      const profit = Number(s.total_profit);
+      return {
+        name: s.subgroup.length > 20 ? s.subgroup.substring(0, 20) + '...' : s.subgroup,
+        fullName: s.subgroup,
+        margin: sales > 0 ? (profit / sales) * 100 : 0,
+        sales,
+        profit,
+      };
+    }).sort((a, b) => b.margin - a.margin);
+  }, [rawSubgroup]);
 
-  // BCG Matrix customization state
   const [bcgSettingsOpen, setBcgSettingsOpen] = useState(false);
   const [customMarginThreshold, setCustomMarginThreshold] = useState<number | null>(null);
   const [customSalesThreshold, setCustomSalesThreshold] = useState<number | null>(null);
 
-  // Matriz BCG de Produtos (Volume x Margem)
   const bcgMatrixData = useMemo(() => {
-    const productData: Record<string, { name: string; code: string; sales: number; profit: number; quantity: number }> = {};
-    data.forEach(item => {
-      const key = item.product_code;
-      if (!productData[key]) {
-        productData[key] = { 
-          name: item.product_description.substring(0, 25), 
-          code: item.product_code,
-          sales: 0, 
-          profit: 0, 
-          quantity: 0 
-        };
-      }
-      productData[key].sales += Number(item.sales_value);
-      productData[key].profit += Number(item.profit);
-      productData[key].quantity += Number(item.quantity);
+    const products = topProducts.map(p => {
+      const sales = Number(p.total_sales);
+      const profit = Number(p.total_profit);
+      return {
+        name: p.product_description.substring(0, 25),
+        code: p.product_code,
+        sales,
+        profit,
+        quantity: Number(p.total_quantity),
+        margin: sales > 0 ? (profit / sales) * 100 : 0,
+      };
     });
-    
-    const products = Object.values(productData).map(p => ({
-      ...p,
-      margin: p.sales > 0 ? (p.profit / p.sales) * 100 : 0
-    }));
-    
+
     const calculatedAvgMargin = products.length > 0 ? products.reduce((sum, p) => sum + p.margin, 0) / products.length : 0;
     const calculatedAvgSales = products.length > 0 ? products.reduce((sum, p) => sum + p.sales, 0) / products.length : 0;
     const maxSales = Math.max(...products.map(p => p.sales), 1);
     const maxMargin = Math.max(...products.map(p => p.margin), 1);
-    
+
     const marginThreshold = customMarginThreshold ?? calculatedAvgMargin;
     const salesThreshold = customSalesThreshold ?? calculatedAvgSales;
-    
+
     return {
       products: products.slice(0, 50).map(p => ({
         ...p,
-        quadrant: p.margin >= marginThreshold 
+        quadrant: p.margin >= marginThreshold
           ? (p.sales >= salesThreshold ? 'Estrela' : 'Interrogação')
           : (p.sales >= salesThreshold ? 'Vaca Leiteira' : 'Abacaxi')
       })),
@@ -207,162 +159,86 @@ export function SalesCharts({
       maxSales,
       maxMargin
     };
-  }, [data, customMarginThreshold, customSalesThreshold]);
+  }, [topProducts, customMarginThreshold, customSalesThreshold]);
 
-  // Ticket Médio por Loja e Subgrupo
-  const ticketMedioData = useMemo(() => {
-    const byStore: Record<string, { sales: number; quantity: number }> = {};
-    const bySubgroup: Record<string, { sales: number; quantity: number }> = {};
-    
-    data.forEach(item => {
-      // Por loja
-      if (!byStore[item.store]) {
-        byStore[item.store] = { sales: 0, quantity: 0 };
-      }
-      byStore[item.store].sales += Number(item.sales_value);
-      byStore[item.store].quantity += Number(item.quantity);
-      
-      // Por subgrupo
-      if (!bySubgroup[item.subgroup]) {
-        bySubgroup[item.subgroup] = { sales: 0, quantity: 0 };
-      }
-      bySubgroup[item.subgroup].sales += Number(item.sales_value);
-      bySubgroup[item.subgroup].quantity += Number(item.quantity);
-    });
-    
-    return {
-      byStore: Object.entries(byStore).map(([store, v]) => ({
-        name: `Loja ${store}`,
-        ticketMedio: v.quantity > 0 ? v.sales / v.quantity : 0,
-        sales: v.sales,
-        quantity: v.quantity
-      })).sort((a, b) => b.ticketMedio - a.ticketMedio),
-      bySubgroup: Object.entries(bySubgroup).map(([name, v]) => ({
-        name: name.length > 15 ? name.substring(0, 15) + '...' : name,
-        fullName: name,
-        ticketMedio: v.quantity > 0 ? v.sales / v.quantity : 0,
-        sales: v.sales,
-        quantity: v.quantity
-      })).sort((a, b) => b.ticketMedio - a.ticketMedio).slice(0, 10)
-    };
-  }, [data]);
+  const ticketMedioData = useMemo(() => ({
+    byStore: rawStore.map(s => ({
+      name: `Loja ${s.store}`,
+      ticketMedio: Number(s.total_quantity) > 0 ? Number(s.total_sales) / Number(s.total_quantity) : 0,
+      sales: Number(s.total_sales),
+      quantity: Number(s.total_quantity),
+    })).sort((a, b) => b.ticketMedio - a.ticketMedio),
+    bySubgroup: rawSubgroup.map(s => ({
+      name: s.subgroup.length > 15 ? s.subgroup.substring(0, 15) + '...' : s.subgroup,
+      fullName: s.subgroup,
+      ticketMedio: Number(s.total_quantity) > 0 ? Number(s.total_sales) / Number(s.total_quantity) : 0,
+      sales: Number(s.total_sales),
+      quantity: Number(s.total_quantity),
+    })).sort((a, b) => b.ticketMedio - a.ticketMedio).slice(0, 10),
+  }), [rawStore, rawSubgroup]);
 
-  // Produtos em Alta/Queda (comparando meses)
   const trendingProductsData = useMemo(() => {
-    const monthlyProductSales: Record<string, Record<number, number>> = {};
-    
-    data.forEach(item => {
-      const key = item.product_code;
-      const month = Number(item.month);
-      if (!monthlyProductSales[key]) {
-        monthlyProductSales[key] = {};
+    const byProduct: Record<string, { name: string; months: Record<string, number>; totalSales: number }> = {};
+    productTrends.forEach(row => {
+      if (!byProduct[row.product_code]) {
+        byProduct[row.product_code] = { name: row.product_description.substring(0, 30), months: {}, totalSales: 0 };
       }
-      if (!monthlyProductSales[key][month]) {
-        monthlyProductSales[key][month] = 0;
-      }
-      monthlyProductSales[key][month] += Number(item.sales_value);
+      const key = `${row.data_year}-${row.data_month}`;
+      byProduct[row.product_code].months[key] = (byProduct[row.product_code].months[key] || 0) + Number(row.total_sales);
+      byProduct[row.product_code].totalSales += Number(row.total_sales);
     });
-    
-    const productTrends = Object.entries(monthlyProductSales).map(([code, months]) => {
-      const monthValues = Object.entries(months)
-        .map(([m, v]) => ({ month: Number(m), value: v }))
-        .sort((a, b) => a.month - b.month);
-      
-      if (monthValues.length < 2) {
-        return null;
-      }
-      
-      // Calcular tendência usando os últimos meses disponíveis
-      const recentMonths = monthValues.slice(-3);
-      const firstValue = recentMonths[0]?.value || 0;
-      const lastValue = recentMonths[recentMonths.length - 1]?.value || 0;
-      const growth = firstValue > 0 ? ((lastValue - firstValue) / firstValue) * 100 : 0;
-      const totalSales = monthValues.reduce((sum, m) => sum + m.value, 0);
-      
-      const productInfo = data.find(d => d.product_code === code);
-      
+
+    const trends = Object.entries(byProduct).map(([code, data]) => {
+      const monthKeys = Object.keys(data.months).sort();
+      if (monthKeys.length < 2) return null;
+      const recent = monthKeys.slice(-3);
+      const firstVal = data.months[recent[0]] || 0;
+      const lastVal = data.months[recent[recent.length - 1]] || 0;
+      const growth = firstVal > 0 ? ((lastVal - firstVal) / firstVal) * 100 : 0;
       return {
         code,
-        name: productInfo?.product_description.substring(0, 30) || code,
+        name: data.name,
         growth,
-        totalSales,
-        trend: growth > 10 ? 'up' : growth < -10 ? 'down' : 'stable'
+        totalSales: data.totalSales,
+        trend: growth > 10 ? 'up' as const : growth < -10 ? 'down' as const : 'stable' as const,
       };
-    }).filter(Boolean) as { code: string; name: string; growth: number; totalSales: number; trend: string }[];
-    
-    const sorted = productTrends.sort((a, b) => Math.abs(b.growth) - Math.abs(a.growth));
-    
+    }).filter(Boolean) as { code: string; name: string; growth: number; totalSales: number; trend: 'up' | 'down' | 'stable' }[];
+
+    const sorted = trends.sort((a, b) => Math.abs(b.growth) - Math.abs(a.growth));
     return {
       rising: sorted.filter(p => p.trend === 'up').slice(0, 5),
-      falling: sorted.filter(p => p.trend === 'down').slice(0, 5)
+      falling: sorted.filter(p => p.trend === 'down').slice(0, 5),
     };
-  }, [data]);
+  }, [productTrends]);
+
   const formatCurrency = (value: number) => {
     if (value >= 1000000) return `R$ ${(value / 1000000).toFixed(1)}M`;
     if (value >= 1000) return `R$ ${(value / 1000).toFixed(1)}K`;
     return `R$ ${value.toFixed(0)}`;
   };
-  const formatTooltipCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL"
-    }).format(value);
-  };
-  const getGrowthAnalysis = (currentMonth: number, salesGrowth: number, profitGrowth: number) => {
-    const monthName = MONTHS[currentMonth - 1];
-    
-    if (currentMonth === 1) {
-      return "Janeiro é o primeiro mês do período, sem dados anteriores para comparação.";
-    }
 
-    const salesTrend = salesGrowth >= 0 ? "crescimento" : "queda";
-    const profitTrend = profitGrowth >= 0 ? "crescimento" : "queda";
-    const salesAbs = Math.abs(salesGrowth).toFixed(1);
-    const profitAbs = Math.abs(profitGrowth).toFixed(1);
+  const formatTooltipCurrency = (value: number) =>
+    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
-    if (salesGrowth >= 0 && profitGrowth >= 0) {
-      return `${monthName} apresentou ${salesTrend} de ${salesAbs}% no faturamento e ${profitTrend} de ${profitAbs}% no lucro em relação ao mês anterior, indicando bom desempenho geral.`;
-    } else if (salesGrowth >= 0 && profitGrowth < 0) {
-      return `${monthName} apresentou ${salesTrend} de ${salesAbs}% no faturamento, porém ${profitTrend} de ${profitAbs}% no lucro, indicando possível impacto de precificação, aumento de custos ou promoções agressivas.`;
-    } else if (salesGrowth < 0 && profitGrowth >= 0) {
-      return `${monthName} apresentou ${salesTrend} de ${salesAbs}% no faturamento, mas ${profitTrend} de ${profitAbs}% no lucro, indicando melhor margem ou mix de produtos mais rentáveis.`;
-    } else {
-      return `${monthName} apresentou ${salesTrend} de ${salesAbs}% no faturamento e ${profitTrend} de ${profitAbs}% no lucro, indicando necessidade de revisão de estratégia comercial ou possível sazonalidade.`;
-    }
-  };
-
-  const MonthlyGrowthTooltip = ({
-    active,
-    payload,
-    label
-  }: any) => {
+  const MonthlyGrowthTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const monthIndex = MONTHS.indexOf(label);
       const monthNum = monthIndex + 1;
 
-      // Group data by year
       const yearData: Record<number, { sales: number; profit: number; margin: number }> = {};
       availableYears.forEach(year => {
         const salesEntry = payload.find((p: any) => p.dataKey === `sales_${year}`);
         const profitEntry = payload.find((p: any) => p.dataKey === `profit_${year}`);
         const sales = salesEntry?.value || 0;
         const profit = profitEntry?.value || 0;
-        yearData[year] = {
-          sales,
-          profit,
-          margin: sales > 0 ? (profit / sales) * 100 : 0
-        };
+        yearData[year] = { sales, profit, margin: sales > 0 ? (profit / sales) * 100 : 0 };
       });
 
-      // Previous month data for MoM growth
       const prevMonthData: Record<number, { sales: number; profit: number }> = {};
       if (monthNum > 1) {
         availableYears.forEach(year => {
           const prevRow = monthlyData[monthNum - 2];
-          prevMonthData[year] = {
-            sales: prevRow?.[`sales_${year}`] || 0,
-            profit: prevRow?.[`profit_${year}`] || 0
-          };
+          prevMonthData[year] = { sales: prevRow?.[`sales_${year}`] || 0, profit: prevRow?.[`profit_${year}`] || 0 };
         });
       }
 
@@ -374,49 +250,30 @@ export function SalesCharts({
           {sortedYears.map((year, yi) => {
             const yd = yearData[year];
             if (!yd || (yd.sales === 0 && yd.profit === 0)) return null;
-
-            // MoM growth
             const prev = prevMonthData[year];
             const salesMoM = prev && prev.sales > 0 ? ((yd.sales - prev.sales) / prev.sales) * 100 : null;
             const profitMoM = prev && prev.profit > 0 ? ((yd.profit - prev.profit) / prev.profit) * 100 : null;
-
-            // YoY growth (compare with previous year same month)
             const prevYear = sortedYears.find(y => y < year);
             const prevYearData = prevYear ? yearData[prevYear] : null;
             const salesYoY = prevYearData && prevYearData.sales > 0 ? ((yd.sales - prevYearData.sales) / prevYearData.sales) * 100 : null;
             const profitYoY = prevYearData && prevYearData.profit > 0 ? ((yd.profit - prevYearData.profit) / prevYearData.profit) * 100 : null;
-
             const colorIdx = availableYears.indexOf(year);
 
             return (
               <div key={year} className={`${yi > 0 ? 'mt-3 pt-3 border-t border-border/50' : ''}`}>
                 <p className="font-semibold text-foreground mb-1.5">{year}</p>
-                
-                {/* Faturamento */}
                 <div className="flex items-center justify-between gap-4 text-sm mb-1">
-                  <span style={{ color: YEAR_COLORS[colorIdx % YEAR_COLORS.length].sales }}>
-                    Faturamento:
-                  </span>
+                  <span style={{ color: YEAR_COLORS[colorIdx % YEAR_COLORS.length].sales }}>Faturamento:</span>
                   <span className="font-medium text-foreground">{formatTooltipCurrency(yd.sales)}</span>
                 </div>
-                
-                {/* Lucro */}
                 <div className="flex items-center justify-between gap-4 text-sm mb-1">
-                  <span style={{ color: YEAR_COLORS[colorIdx % YEAR_COLORS.length].profit }}>
-                    Lucro:
-                  </span>
+                  <span style={{ color: YEAR_COLORS[colorIdx % YEAR_COLORS.length].profit }}>Lucro:</span>
                   <span className="font-medium text-foreground">{formatTooltipCurrency(yd.profit)}</span>
                 </div>
-                
-                {/* Margem */}
                 <div className="flex items-center justify-between gap-4 text-sm mb-1.5">
                   <span className="text-muted-foreground">Margem:</span>
-                  <span className={`font-semibold ${yd.margin >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                    {yd.margin.toFixed(1)}%
-                  </span>
+                  <span className={`font-semibold ${yd.margin >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{yd.margin.toFixed(1)}%</span>
                 </div>
-
-                {/* Crescimento MoM */}
                 {monthNum > 1 && salesMoM !== null && (
                   <div className="flex items-center justify-between gap-4 text-xs text-muted-foreground">
                     <span>vs mês anterior:</span>
@@ -432,8 +289,6 @@ export function SalesCharts({
                     </span>
                   </div>
                 )}
-
-                {/* Crescimento YoY */}
                 {salesYoY !== null && (
                   <div className="flex items-center justify-between gap-4 text-xs text-muted-foreground mt-0.5">
                     <span>vs {prevYear}:</span>
@@ -458,24 +313,24 @@ export function SalesCharts({
     return null;
   };
 
-  const CustomTooltip = ({
-    active,
-    payload,
-    label
-  }: any) => {
+  const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-      return <div className="rounded-lg border border-border bg-card p-3 shadow-lg">
+      return (
+        <div className="rounded-lg border border-border bg-card p-3 shadow-lg">
           <p className="mb-2 font-medium text-foreground">{label}</p>
-          {payload.map((entry: any, index: number) => <p key={index} className="text-sm" style={{
-          color: entry.color
-        }}>
+          {payload.map((entry: any, index: number) => (
+            <p key={index} className="text-sm" style={{ color: entry.color }}>
               {entry.name}: {entry.name === "Quantidade" ? entry.value.toLocaleString("pt-BR") : formatTooltipCurrency(entry.value)}
-            </p>)}
-        </div>;
+            </p>
+          ))}
+        </div>
+      );
     }
     return null;
   };
-  return <div className="grid gap-6 lg:grid-cols-2">
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
       {/* Vendas e Lucro por Mês */}
       <Card className="border-border bg-card shadow-card lg:col-span-2">
         <CardHeader>
@@ -551,11 +406,7 @@ export function SalesCharts({
                 <Pie data={subgroupData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value">
                   {subgroupData.map((_, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />)}
                 </Pie>
-                <Tooltip formatter={(value: number) => formatTooltipCurrency(value)} contentStyle={{
-                backgroundColor: "hsl(var(--card))",
-                border: "1px solid hsl(var(--border))",
-                borderRadius: "8px"
-              }} />
+                <Tooltip formatter={(value: number) => formatTooltipCurrency(value)} contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
@@ -585,7 +436,7 @@ export function SalesCharts({
         </CardContent>
       </Card>
 
-      {/* Análise Pareto (80/20) */}
+      {/* Análise Pareto */}
       <Card className="border-border bg-card shadow-card lg:col-span-2">
         <CardHeader>
           <CardTitle className="text-lg">Análise Pareto - Top 15 Produtos (Curva ABC)</CardTitle>
@@ -597,22 +448,16 @@ export function SalesCharts({
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={formatCurrency} />
                 <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={10} width={150} />
-                <Tooltip 
+                <Tooltip
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       const data = payload[0].payload;
                       return (
                         <div className="rounded-lg border border-border bg-card p-3 shadow-lg">
                           <p className="font-medium text-foreground mb-1">{data.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Vendas: {formatTooltipCurrency(data.sales)}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            % do Total: {data.percentual.toFixed(1)}%
-                          </p>
-                          <p className="text-sm font-medium" style={{ color: COLORS.accent }}>
-                            Acumulado: {data.cumulativo.toFixed(1)}%
-                          </p>
+                          <p className="text-sm text-muted-foreground">Vendas: {formatTooltipCurrency(data.sales)}</p>
+                          <p className="text-sm text-muted-foreground">% do Total: {data.percentual.toFixed(1)}%</p>
+                          <p className="text-sm font-medium" style={{ color: COLORS.accent }}>Acumulado: {data.cumulativo.toFixed(1)}%</p>
                         </div>
                       );
                     }
@@ -623,9 +468,7 @@ export function SalesCharts({
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <p className="text-xs text-muted-foreground mt-2 text-center">
-            Identifica os produtos que mais contribuem para o faturamento total
-          </p>
+          <p className="text-xs text-muted-foreground mt-2 text-center">Identifica os produtos que mais contribuem para o faturamento total</p>
         </CardContent>
       </Card>
 
@@ -641,22 +484,16 @@ export function SalesCharts({
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} angle={-45} textAnchor="end" height={80} />
                 <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(v) => `${v.toFixed(0)}%`} />
-                <Tooltip 
+                <Tooltip
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       const data = payload[0].payload;
                       return (
                         <div className="rounded-lg border border-border bg-card p-3 shadow-lg">
                           <p className="font-medium text-foreground mb-1">{data.fullName}</p>
-                          <p className="text-sm" style={{ color: COLORS.profit }}>
-                            Margem: {data.margin.toFixed(1)}%
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Vendas: {formatTooltipCurrency(data.sales)}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Lucro: {formatTooltipCurrency(data.profit)}
-                          </p>
+                          <p className="text-sm" style={{ color: COLORS.profit }}>Margem: {data.margin.toFixed(1)}%</p>
+                          <p className="text-sm text-muted-foreground">Vendas: {formatTooltipCurrency(data.sales)}</p>
+                          <p className="text-sm text-muted-foreground">Lucro: {formatTooltipCurrency(data.profit)}</p>
                         </div>
                       );
                     }
@@ -667,13 +504,11 @@ export function SalesCharts({
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <p className="text-xs text-muted-foreground mt-2 text-center">
-            Compara a rentabilidade (lucro/vendas) entre os diferentes subgrupos de produtos
-          </p>
+          <p className="text-xs text-muted-foreground mt-2 text-center">Compara a rentabilidade (lucro/vendas) entre os diferentes subgrupos de produtos</p>
         </CardContent>
       </Card>
 
-      {/* Matriz BCG de Produtos */}
+      {/* Matriz BCG */}
       <Card className="border-border bg-card shadow-card lg:col-span-2">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg">Matriz BCG - Volume x Margem de Lucro</CardTitle>
@@ -693,52 +528,20 @@ export function SalesCharts({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm">Limite de Margem (%)</Label>
-                    <span className="text-sm font-medium text-muted-foreground">
-                      {(customMarginThreshold ?? bcgMatrixData.avgMargin).toFixed(1)}%
-                    </span>
+                    <span className="text-sm font-medium text-muted-foreground">{(customMarginThreshold ?? bcgMatrixData.avgMargin).toFixed(1)}%</span>
                   </div>
-                  <Slider
-                    value={[customMarginThreshold ?? bcgMatrixData.avgMargin]}
-                    onValueChange={(value) => setCustomMarginThreshold(value[0])}
-                    min={0}
-                    max={Math.min(bcgMatrixData.maxMargin, 100)}
-                    step={0.5}
-                    className="w-full"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Média calculada: {bcgMatrixData.avgMargin.toFixed(1)}%
-                  </p>
+                  <Slider value={[customMarginThreshold ?? bcgMatrixData.avgMargin]} onValueChange={(value) => setCustomMarginThreshold(value[0])} min={0} max={Math.min(bcgMatrixData.maxMargin, 100)} step={0.5} className="w-full" />
+                  <p className="text-xs text-muted-foreground">Média calculada: {bcgMatrixData.avgMargin.toFixed(1)}%</p>
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm">Limite de Vendas (R$)</Label>
-                    <span className="text-sm font-medium text-muted-foreground">
-                      {formatTooltipCurrency(customSalesThreshold ?? bcgMatrixData.avgSales)}
-                    </span>
+                    <span className="text-sm font-medium text-muted-foreground">{formatTooltipCurrency(customSalesThreshold ?? bcgMatrixData.avgSales)}</span>
                   </div>
-                  <Slider
-                    value={[customSalesThreshold ?? bcgMatrixData.avgSales]}
-                    onValueChange={(value) => setCustomSalesThreshold(value[0])}
-                    min={0}
-                    max={bcgMatrixData.maxSales}
-                    step={bcgMatrixData.maxSales / 100}
-                    className="w-full"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Média calculada: {formatTooltipCurrency(bcgMatrixData.avgSales)}
-                  </p>
+                  <Slider value={[customSalesThreshold ?? bcgMatrixData.avgSales]} onValueChange={(value) => setCustomSalesThreshold(value[0])} min={0} max={bcgMatrixData.maxSales} step={bcgMatrixData.maxSales / 100} className="w-full" />
+                  <p className="text-xs text-muted-foreground">Média calculada: {formatTooltipCurrency(bcgMatrixData.avgSales)}</p>
                 </div>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => {
-                    setCustomMarginThreshold(null);
-                    setCustomSalesThreshold(null);
-                  }}
-                  className="w-full"
-                >
-                  Restaurar Valores Padrão
-                </Button>
+                <Button variant="outline" size="sm" onClick={() => { setCustomMarginThreshold(null); setCustomSalesThreshold(null); }} className="w-full">Restaurar Valores Padrão</Button>
               </div>
             </CollapsibleContent>
           </Collapsible>
@@ -746,28 +549,12 @@ export function SalesCharts({
             <ResponsiveContainer width="100%" height="100%">
               <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis 
-                  type="number" 
-                  dataKey="sales" 
-                  name="Vendas" 
-                  stroke="hsl(var(--muted-foreground))" 
-                  fontSize={12}
-                  tickFormatter={formatCurrency}
-                  label={{ value: 'Volume de Vendas', position: 'bottom', offset: 0, fill: 'hsl(var(--muted-foreground))' }}
-                />
-                <YAxis 
-                  type="number" 
-                  dataKey="margin" 
-                  name="Margem" 
-                  stroke="hsl(var(--muted-foreground))" 
-                  fontSize={12}
-                  tickFormatter={(v) => `${v.toFixed(0)}%`}
-                  label={{ value: 'Margem %', angle: -90, position: 'insideLeft', fill: 'hsl(var(--muted-foreground))' }}
-                />
+                <XAxis type="number" dataKey="sales" name="Vendas" stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={formatCurrency} label={{ value: 'Volume de Vendas', position: 'bottom', offset: 0, fill: 'hsl(var(--muted-foreground))' }} />
+                <YAxis type="number" dataKey="margin" name="Margem" stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(v) => `${v.toFixed(0)}%`} label={{ value: 'Margem %', angle: -90, position: 'insideLeft', fill: 'hsl(var(--muted-foreground))' }} />
                 <ZAxis type="number" dataKey="quantity" range={[50, 400]} />
                 <ReferenceLine x={bcgMatrixData.salesThreshold} stroke="hsl(var(--primary))" strokeDasharray="5 5" strokeWidth={2} />
                 <ReferenceLine y={bcgMatrixData.marginThreshold} stroke="hsl(var(--primary))" strokeDasharray="5 5" strokeWidth={2} />
-                <Tooltip 
+                <Tooltip
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       const data = payload[0].payload;
@@ -775,34 +562,28 @@ export function SalesCharts({
                         <div className="rounded-lg border border-border bg-card p-3 shadow-lg">
                           <p className="font-medium text-foreground mb-1">{data.name}</p>
                           <p className="text-xs text-muted-foreground">Código: {data.code}</p>
-                          <p className="text-sm" style={{ color: COLORS.sales }}>
-                            Vendas: {formatTooltipCurrency(data.sales)}
-                          </p>
-                          <p className="text-sm" style={{ color: COLORS.profit }}>
-                            Margem: {data.margin.toFixed(1)}%
-                          </p>
-                          <p className="text-sm font-medium mt-1" style={{ 
-                            color: data.quadrant === 'Estrela' ? COLORS.profit : 
-                                   data.quadrant === 'Vaca Leiteira' ? COLORS.sales :
-                                   data.quadrant === 'Interrogação' ? COLORS.accent : 'hsl(var(--destructive))'
-                          }}>
-                            Quadrante: {data.quadrant}
-                          </p>
+                          <p className="text-sm" style={{ color: COLORS.sales }}>Vendas: {formatTooltipCurrency(data.sales)}</p>
+                          <p className="text-sm" style={{ color: COLORS.profit }}>Margem: {data.margin.toFixed(1)}%</p>
+                          <p className="text-sm font-medium mt-1" style={{
+                            color: data.quadrant === 'Estrela' ? COLORS.profit :
+                              data.quadrant === 'Vaca Leiteira' ? COLORS.sales :
+                                data.quadrant === 'Interrogação' ? COLORS.accent : 'hsl(var(--destructive))'
+                          }}>Quadrante: {data.quadrant}</p>
                         </div>
                       );
                     }
                     return null;
                   }}
                 />
-                <Scatter 
-                  name="Produtos" 
-                  data={bcgMatrixData.products} 
+                <Scatter
+                  name="Produtos"
+                  data={bcgMatrixData.products}
                   fill={COLORS.sales}
                   shape={(props: any) => {
                     const { cx, cy, payload } = props;
-                    const color = payload.quadrant === 'Estrela' ? COLORS.profit : 
-                                 payload.quadrant === 'Vaca Leiteira' ? COLORS.sales :
-                                 payload.quadrant === 'Interrogação' ? COLORS.accent : 'hsl(var(--destructive))';
+                    const color = payload.quadrant === 'Estrela' ? COLORS.profit :
+                      payload.quadrant === 'Vaca Leiteira' ? COLORS.sales :
+                        payload.quadrant === 'Interrogação' ? COLORS.accent : 'hsl(var(--destructive))';
                     return <circle cx={cx} cy={cy} r={6} fill={color} fillOpacity={0.7} stroke={color} />;
                   }}
                 />
@@ -818,7 +599,7 @@ export function SalesCharts({
         </CardContent>
       </Card>
 
-      {/* Ticket Médio */}
+      {/* Ticket Médio por Loja */}
       <Card className="border-border bg-card shadow-card">
         <CardHeader>
           <CardTitle className="text-lg">Ticket Médio por Loja</CardTitle>
@@ -830,22 +611,16 @@ export function SalesCharts({
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={formatCurrency} />
                 <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} width={70} />
-                <Tooltip 
+                <Tooltip
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       const data = payload[0].payload;
                       return (
                         <div className="rounded-lg border border-border bg-card p-3 shadow-lg">
                           <p className="font-medium text-foreground mb-1">{data.name}</p>
-                          <p className="text-sm" style={{ color: COLORS.accent }}>
-                            Ticket Médio: {formatTooltipCurrency(data.ticketMedio)}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Total Vendas: {formatTooltipCurrency(data.sales)}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Qtd. Vendida: {data.quantity.toLocaleString('pt-BR')}
-                          </p>
+                          <p className="text-sm" style={{ color: COLORS.accent }}>Ticket Médio: {formatTooltipCurrency(data.ticketMedio)}</p>
+                          <p className="text-sm text-muted-foreground">Total Vendas: {formatTooltipCurrency(data.sales)}</p>
+                          <p className="text-sm text-muted-foreground">Qtd. Vendida: {data.quantity.toLocaleString('pt-BR')}</p>
                         </div>
                       );
                     }
@@ -871,19 +646,15 @@ export function SalesCharts({
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} angle={-45} textAnchor="end" height={70} />
                 <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={formatCurrency} />
-                <Tooltip 
+                <Tooltip
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       const data = payload[0].payload;
                       return (
                         <div className="rounded-lg border border-border bg-card p-3 shadow-lg">
                           <p className="font-medium text-foreground mb-1">{data.fullName}</p>
-                          <p className="text-sm" style={{ color: COLORS.quantity }}>
-                            Ticket Médio: {formatTooltipCurrency(data.ticketMedio)}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Total Vendas: {formatTooltipCurrency(data.sales)}
-                          </p>
+                          <p className="text-sm" style={{ color: COLORS.quantity }}>Ticket Médio: {formatTooltipCurrency(data.ticketMedio)}</p>
+                          <p className="text-sm text-muted-foreground">Total Vendas: {formatTooltipCurrency(data.sales)}</p>
                         </div>
                       );
                     }
@@ -904,14 +675,13 @@ export function SalesCharts({
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 gap-6">
-            {/* Produtos em Alta */}
             <div>
               <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-emerald-500" />
                 Em Alta
               </h4>
               <div className="space-y-2">
-                {trendingProductsData.rising.length > 0 ? trendingProductsData.rising.map((product, index) => (
+                {trendingProductsData.rising.length > 0 ? trendingProductsData.rising.map((product) => (
                   <div key={product.code} className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{product.name}</p>
@@ -927,15 +697,13 @@ export function SalesCharts({
                 )}
               </div>
             </div>
-
-            {/* Produtos em Queda */}
             <div>
               <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
                 <TrendingDown className="w-4 h-4 text-red-500" />
                 Em Queda
               </h4>
               <div className="space-y-2">
-                {trendingProductsData.falling.length > 0 ? trendingProductsData.falling.map((product, index) => (
+                {trendingProductsData.falling.length > 0 ? trendingProductsData.falling.map((product) => (
                   <div key={product.code} className="flex items-center justify-between p-2 rounded-lg bg-red-500/10 border border-red-500/20">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{product.name}</p>
@@ -952,10 +720,9 @@ export function SalesCharts({
               </div>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground mt-4 text-center">
-            Análise baseada na variação de vendas nos últimos meses disponíveis
-          </p>
+          <p className="text-xs text-muted-foreground mt-4 text-center">Análise baseada na variação de vendas nos últimos meses disponíveis</p>
         </CardContent>
       </Card>
-    </div>;
+    </div>
+  );
 }
