@@ -25,7 +25,7 @@ export interface SalesData {
 export interface Filters {
   year: string;
   month: string;
-  store: string;
+  stores: string[];
   subgroup: string;
 }
 const Index = () => {
@@ -34,7 +34,7 @@ const Index = () => {
   const [filters, setFilters] = useState<Filters>({
     year: "all",
     month: "all",
-    store: "all",
+    stores: [],
     subgroup: "all"
   });
   const [searchTerm, setSearchTerm] = useState("");
@@ -115,8 +115,8 @@ const Index = () => {
       if (filters.month !== "all") {
         query = query.eq("month", parseInt(filters.month));
       }
-      if (filters.store !== "all") {
-        query = query.eq("store", filters.store);
+      if (filters.stores.length > 0) {
+        query = query.in("store", filters.stores);
       }
       if (filters.subgroup !== "all") {
         query = query.eq("subgroup", filters.subgroup);
@@ -139,7 +139,7 @@ const Index = () => {
     setData(allData);
     setLoading(false);
   };
-  const handleFilterChange = (key: keyof Filters, value: string) => {
+  const handleFilterChange = (key: keyof Filters, value: string | string[]) => {
     setFilters(prev => ({
       ...prev,
       [key]: value
