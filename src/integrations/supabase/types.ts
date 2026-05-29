@@ -231,6 +231,67 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_dashboard_stats: {
+        Args: {
+          p_month?: number
+          p_stores?: string[]
+          p_subgroup?: string
+          p_year?: number
+        }
+        Returns: Json
+      }
+      get_declining_products: {
+        Args: {
+          p_month?: number
+          p_stores?: string[]
+          p_subgroup?: string
+          p_year?: number
+        }
+        Returns: {
+          first_period_label: string
+          first_period_profit: number
+          first_period_sales: number
+          product_code: string
+          product_description: string
+          profit_delta_pct: number
+          sales_delta_pct: number
+          second_period_label: string
+          second_period_profit: number
+          second_period_sales: number
+        }[]
+      }
+      get_filter_options: { Args: never; Returns: Json }
+      get_monthly_chart_data: {
+        Args: {
+          p_month?: number
+          p_stores?: string[]
+          p_subgroup?: string
+          p_year?: number
+        }
+        Returns: {
+          data_month: number
+          data_year: number
+          total_profit: number
+          total_quantity: number
+          total_sales: number
+        }[]
+      }
+      get_product_trends_data: {
+        Args: {
+          p_limit?: number
+          p_month?: number
+          p_stores?: string[]
+          p_subgroup?: string
+          p_year?: number
+        }
+        Returns: {
+          data_month: number
+          data_year: number
+          product_code: string
+          product_description: string
+          total_sales: number
+        }[]
+      }
       get_stock_days: {
         Args: { min_days?: number; months_back?: number }
         Returns: {
@@ -240,6 +301,50 @@ export type Database = {
           product_description: string
           stock_value: number
           store: string
+        }[]
+      }
+      get_store_chart_data: {
+        Args: {
+          p_month?: number
+          p_stores?: string[]
+          p_subgroup?: string
+          p_year?: number
+        }
+        Returns: {
+          store: string
+          total_profit: number
+          total_quantity: number
+          total_sales: number
+        }[]
+      }
+      get_subgroup_chart_data: {
+        Args: {
+          p_month?: number
+          p_stores?: string[]
+          p_subgroup?: string
+          p_year?: number
+        }
+        Returns: {
+          subgroup: string
+          total_profit: number
+          total_quantity: number
+          total_sales: number
+        }[]
+      }
+      get_top_products_data: {
+        Args: {
+          p_limit?: number
+          p_month?: number
+          p_stores?: string[]
+          p_subgroup?: string
+          p_year?: number
+        }
+        Returns: {
+          product_code: string
+          product_description: string
+          total_profit: number
+          total_quantity: number
+          total_sales: number
         }[]
       }
     }
