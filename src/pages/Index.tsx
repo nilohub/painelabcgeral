@@ -55,54 +55,72 @@ const Index = () => {
     stores: [] as string[],
     subgroups: [] as string[]
   });
-  const [loadedCount, setLoadedCount] = useState(0);
   useEffect(() => {
-    // Parallelize first load: filters + data together
-    void Promise.all([fetchFilterOptions(), fetchData()]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchData();
+    fetchFilterOptions();
   }, []);
   useEffect(() => {
     fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
   const fetchFilterOptions = async () => {
-    const { data: opts, error } = await supabase.rpc("get_filter_options");
-    if (error || !opts) return;
-    const o = opts as { years: number[]; months: number[]; stores: string[]; subgroups: string[] };
-    setAvailableFilters({
-      years: (o.years || []).map(String),
-      months: (o.months || []).map(String),
-      stores: o.stores || [],
-      subgroups: o.subgroups || [],
-    });
-  };
-  const fetchData = async () => {
-    setLoading(true);
-    setLoadedCount(0);
-    const allData: SalesData[] = [];
+    let allFilterData: { year: number; month: number; store: string; subgroup: string }[] = [];
     let from = 0;
-    const batchSize = 2000;
+    const batchSize = 1000;
     let hasMore = true;
+
     while (hasMore) {
-      let query = supabase.from("sales_data").select("*").range(from, from + batchSize - 1);
-      if (filters.year !== "all") query = query.eq("year", parseInt(filters.year));
-      if (filters.month !== "all") query = query.eq("month", parseInt(filters.month));
-      if (filters.stores.length > 0) query = query.in("store", filters.stores);
-      if (filters.subgroup !== "all") query = query.eq("subgroup", filters.subgroup);
-      const { data: salesData, error } = await query;
-      if (error) {
-        console.error("Error fetching data:", error);
-        break;
-      }
+      const { data: salesData } = await supabase
+        .from("sales_data")
+        .select("year, month, store, subgroup")
+        .range(from, from + batchSize - 1);
+
       if (salesData && salesData.length > 0) {
-        allData.push(...(salesData as SalesData[]));
-        setLoadedCount(allData.length);
+        allFilterData = [...allFilterData, ...salesData];
         from += batchSize;
         hasMore = salesData.length === batchSize;
       } else {
         hasMore = false;
       }
     }
+
+    if (allFilterData.length > 0) {
+      const years = [...new Set(allFilterData.map(d => d.year.toString()))].sort();
+      const months = [...new Set(allFilterData.map(d => d.month.toString()))].sort((a, b) => Number(a) - Number(b));
+      const stores = [...new Set(allFilterData.map(d => d.store))].sort();
+      const subgroups = [...new Set(allFilterData.map(d => d.subgroup))].sort();
+      setAvailableFilters({ years, months, stores, subgroups });
+    }
+  };
+  const fetchData = async () => {
+    setLoading(true);
+
+    let allData: SalesData[] = [];
+    let from = 0;
+    const batchSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      let query = supabase.from("sales_data").select("*").range(from, from + batchSize - 1);
+
+      if (filters.year !== "all") query = query.eq("year", parseInt(filters.year));
+      if (filters.month !== "all") query = query.eq("month", parseInt(filters.month));
+      if (filters.stores.length > 0) query = query.in("store", filters.stores);
+      if (filters.subgroup !== "all") query = query.eq("subgroup", filters.subgroup);
+
+      const { data: salesData, error } = await query;
+
+      if (error) {
+        console.error("Error fetching data:", error);
+        hasMore = false;
+      } else if (salesData && salesData.length > 0) {
+        allData = [...allData, ...salesData];
+        from += batchSize;
+        hasMore = salesData.length === batchSize;
+      } else {
+        hasMore = false;
+      }
+    }
+
     setData(allData);
     setLoading(false);
   };
@@ -117,9 +135,7 @@ const Index = () => {
         <div className="flex h-[60vh] items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
-            <p className="text-muted-foreground">
-              Carregando dados{loadedCount > 0 ? ` — ${loadedCount.toLocaleString("pt-BR")} registros` : "..."}
-            </p>
+            <p className="text-muted-foreground">Carregando dados...</p>
           </div>
         </div>
       </Layout>;
