@@ -292,6 +292,26 @@ export type Database = {
           total_sales: number
         }[]
       }
+      get_rising_products: {
+        Args: {
+          p_month?: number
+          p_stores?: string[]
+          p_subgroup?: string
+          p_year?: number
+        }
+        Returns: {
+          first_period_label: string
+          first_period_profit: number
+          first_period_sales: number
+          product_code: string
+          product_description: string
+          profit_delta_pct: number
+          sales_delta_pct: number
+          second_period_label: string
+          second_period_profit: number
+          second_period_sales: number
+        }[]
+      }
       get_stock_days: {
         Args: { min_days?: number; months_back?: number }
         Returns: {
